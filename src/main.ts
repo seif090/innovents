@@ -73,6 +73,11 @@ async function bootstrap() {
         'JWT-auth',
       )
       .addTag('Health', 'System health checks, liveness, and readiness probes')
+      .addTag(
+        'Authentication',
+        'Registration, OTP verification, login, refresh, logout, password reset',
+      )
+      .addTag('Users', 'User identity profiles and account management')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);

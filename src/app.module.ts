@@ -13,6 +13,8 @@ import { RealtimeModule } from './infrastructure/realtime/realtime.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -45,7 +47,9 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     PaymentsModule,
     RealtimeModule,
 
-    // System Modules
+    // Domain & System Modules
+    AuthModule,
+    UsersModule,
     AuditModule,
     OutboxModule,
     HealthModule,
