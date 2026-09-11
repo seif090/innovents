@@ -31,6 +31,7 @@ enum OutboxStatus {
   PROCESSING
   PROCESSED
   FAILED
+  DEAD_LETTER
 
   @@map("outbox_status")
 }
@@ -81,6 +82,9 @@ model User {
   createdMeetups          CommunityMeetup[]     @relation("CreatedMeetups")
   meetupParticipations    CommunityMeetupParticipant[] @relation("MeetupParticipations")
   communityChatMessages   CommunityChatMessage[] @relation("CommunityChatMessages")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  userDevices             UserDevice[]
 
   @@index([email])
   @@index([status])
@@ -228,18 +232,20 @@ model AuditLog {
 // ------------------------------------------------------------------------------
 
 model OutboxEvent {
-  id            String       @id @default(uuid()) @db.Uuid
-  eventType     String       @map("event_type") @db.VarChar(100)
-  aggregateType String       @map("aggregate_type") @db.VarChar(100)
-  aggregateId   String       @map("aggregate_id") @db.VarChar(100)
-  payload       Json         @db.JsonB
-  status        OutboxStatus @default(PENDING)
-  attempts      Int          @default(0)
-  lastError     String?      @map("last_error") @db.Text
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  processedAt   DateTime?    @map("processed_at") @db.Timestamptz(6)
+  id                  String       @id @default(uuid()) @db.Uuid
+  eventType           String       @map("event_type") @db.VarChar(100)
+  aggregateType       String       @map("aggregate_type") @db.VarChar(100)
+  aggregateId         String       @map("aggregate_id") @db.VarChar(100)
+  payload             Json         @db.JsonB
+  status              OutboxStatus @default(PENDING)
+  attempts            Int          @default(0)
+  lastError           String?      @map("last_error") @db.Text
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  processedAt         DateTime?    @map("processed_at") @db.Timestamptz(6)
+  processingStartedAt DateTime?    @map("processing_started_at") @db.Timestamptz(6)
 
   @@index([status, createdAt])
+  @@index([status, processingStartedAt])
   @@index([aggregateType, aggregateId])
   @@map("outbox_events")
 }
@@ -783,4 +789,146 @@ model CommunityChatMessage {
   @@index([senderId])
   @@map("community_chat_messages")
 }
+
+// ------------------------------------------------------------------------------
+// Sprint 5: Notifications, Preferences, Devices & Realtime Messaging
+// ------------------------------------------------------------------------------
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+
+  @@map("notification_channel")
+}
+
+enum NotificationType {
+  EVENT_PUBLISHED
+  EVENT_CANCELLED
+  SESSION_REMINDER
+  COMMUNITY_POST_MENTION
+  COMMUNITY_POST_REPLY
+  COMMUNITY_MEETUP_CREATED
+  COMMUNITY_MEETUP_REMINDER
+  COMMUNITY_MEMBER_ACTION
+  COMMUNITY_MODERATION_ACTION
+  CHAT_MESSAGE
+  SECURITY_EMAIL_VERIFICATION
+  SECURITY_PASSWORD_RESET
+  ACCOUNT_APPROVED
+  ACCOUNT_REJECTED
+  ACCOUNT_SUSPENDED
+
+  @@map("notification_type")
+}
+
+enum NotificationStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@map("notification_status")
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+
+  @@map("device_platform")
+}
+
+enum DeliveryAttemptStatus {
+  PENDING
+  SUCCESS
+  FAILED
+
+  @@map("delivery_attempt_status")
+}
+
+model Notification {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  type           NotificationType
+  channel        NotificationChannel
+  title          String              @db.VarChar(255)
+  body           String              @db.Text
+  data           Json?               @db.JsonB
+  status         NotificationStatus  @default(PENDING)
+  readAt         DateTime?           @map("read_at") @db.Timestamptz(6)
+  deliveredAt    DateTime?           @map("delivered_at") @db.Timestamptz(6)
+  failedAt       DateTime?           @map("failed_at") @db.Timestamptz(6)
+  idempotencyKey String?             @unique @map("idempotency_key") @db.VarChar(255)
+  expiresAt      DateTime?           @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user             User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAttempts NotificationDeliveryAttempt[]
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("notifications")
+}
+
+model NotificationDeliveryAttempt {
+  id                String                @id @default(uuid()) @db.Uuid
+  notificationId    String                @map("notification_id") @db.Uuid
+  channel           NotificationChannel
+  attemptNumber     Int                   @map("attempt_number")
+  status            DeliveryAttemptStatus
+  providerMessageId String?               @map("provider_message_id") @db.VarChar(255)
+  errorCode         String?               @map("error_code") @db.VarChar(100)
+  errorMessage      String?               @map("error_message") @db.Text
+  startedAt         DateTime              @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt       DateTime?             @map("completed_at") @db.Timestamptz(6)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  notification      Notification          @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notification_delivery_attempts")
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  type      NotificationType
+  channel   NotificationChannel
+  isEnabled Boolean             @default(true) @map("is_enabled")
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model UserDevice {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  platform   DevicePlatform
+  token      String         @db.Text
+  tokenHash  String         @unique @map("token_hash") @db.VarChar(64)
+  isActive   Boolean        @default(true) @map("is_active")
+  lastSeenAt DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt  DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@map("user_devices")
+}
+
 

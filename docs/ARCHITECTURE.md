@@ -117,3 +117,23 @@ To eliminate race conditions and prevent over-subscription under high concurrenc
 - **Room Authorization:** Socket joins (`join_community`) verify that the authenticated user is an active member of the target community before binding them to room `community:${communityId}`.
 - **Message Dispatch:** Chat messages received over WebSockets are validated, persisted to PostgreSQL via `CommunityChatService`, and broadcast in realtime to the community room (`new_message`).
 
+---
+
+## 7. Communication Platform & Notification Architecture (Sprint 5)
+
+### 7.1 Decoupled Outbox-Driven Orchestration
+Business domain modules remain fully decoupled from notification delivery mechanisms. State changes emit domain records to `outbox_events` in the same ACID database transaction:
+- **Outbox Claiming:** The `OutboxProcessor` claims batches using PostgreSQL `SELECT ... FOR UPDATE SKIP LOCKED`, preventing competing worker collisions.
+- **Stale Processing Recovery:** Records stuck in `PROCESSING` longer than 5 minutes are reclaimed back to `PENDING` or directed to `DEAD_LETTER` after 5 failed attempts.
+- **Channel Resolution:** `NotificationPreferenceService` verifies user opt-in status per channel (`IN_APP`, `PUSH`, `EMAIL`) while enforcing mandatory delivery for security notifications.
+
+### 7.2 Multi-Channel Delivery Infrastructure
+- **In-App Delivery:** Socket.IO gateway on `/notifications` namespace delivers live notifications directly to private `user:${userId}` rooms upon creation.
+- **Push Delivery:** `PushProvider` abstraction sends push notifications using device tokens encrypted at rest via AES-256-GCM. Unregistered tokens automatically trigger device deactivation.
+- **Email Delivery:** Localized template engine (`EmailTemplateService`) produces responsive HTML and plain text fallbacks in English and Arabic (`dir="rtl"`). Dispatched asynchronously via BullMQ `email-queue` to prevent HTTP thread blocking.
+
+### 7.3 Concurrency & Idempotency
+- Notifications enforce database-level uniqueness via `idempotencyKey` (`UNIQUE`), ensuring that duplicate event emissions, queue retries, or concurrent workers result in a single delivery record.
+- Bulk events (event cancellations, meetup announcements) execute via `NotificationFanoutService` using safe batch chunking (100 users per chunk).
+
+

@@ -162,4 +162,32 @@ INOVENT is designed with defense-in-depth principles. No single security control
 - Mention tokens (`@username`) are sanitized and validated against active database users before creating mention records.
 - Soft-deletion semantics are applied to posts, marking `status: DELETED` to preserve auditability while shielding content from the social feed.
 
+---
+
+## 8. Communication Platform & Notification Security Architecture (Sprint 5)
+
+### 8.1 Device Token Encryption-at-Rest & Search Hashing
+- **Encrypted Storage:** Push notification tokens (`UserDevice.token`) are encrypted at rest using AES-256-GCM (`CryptoUtil.encrypt`) with an application secret key. Plaintext tokens are never stored in the database.
+- **Fingerprint Hashing:** Tokens are hashed using SHA-256 (`UserDevice.tokenHash`) to enable indexed, unique lookups and deduplication without revealing the plaintext secret.
+- **Zero Exposure:** Raw tokens are never logged in application traces and are masked (e.g. `***123456`) in all user-facing REST responses (`UserDeviceResponseDto`).
+
+### 8.2 Mandatory Security Notification Overrides
+- `NotificationPreferenceService` enforces that security and account integrity notifications cannot be opted out of:
+  - `SECURITY_PASSWORD_RESET`
+  - `SECURITY_EMAIL_VERIFICATION`
+  - `ACCOUNT_SUSPENDED`
+  - `ACCOUNT_REJECTED`
+  - `ACCOUNT_APPROVED`
+- Any user update attempting to disable these security channels is silently ignored or rejected, ensuring critical security communications cannot be bypassed.
+
+### 8.3 Realtime Socket.IO Handshake & Cross-User Isolation
+- **Strict Handshake Verification:** The `/notifications` Socket.IO gateway extracts Bearer JWTs from handshake authentication headers or auth payload and verifies them via `TokenService`. Connections with missing, malformed, or expired tokens are immediately terminated (`disconnect(true)`).
+- **Account State Verification:** Only users with `status: ACTIVE` and `deletedAt: null` may establish WebSocket connections. Suspended or deactivated users are rejected at the handshake.
+- **Room Containment:** Upon authentication, sockets join `user:${userId}`. Live notifications are broadcast strictly to this private room, guaranteeing zero cross-user message leakage.
+
+### 8.4 IDOR & Ownership Controls
+- All notification operations (`GET /notifications`, `PATCH /notifications/:id/read`, `DELETE /notifications/:id`) verify that the target notification record belongs to the calling user (`notification.userId === userId`). Unauthorized access returns `HTTP 403 Forbidden`.
+- Device revocation (`DELETE /notifications/devices/:id`) similarly asserts that the device belongs to `@CurrentUser('sub')`.
+
+
 

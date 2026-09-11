@@ -56,4 +56,14 @@ export default () => ({
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
     },
   },
+  notifications: {
+    pushProvider: process.env.PUSH_PROVIDER || 'mock',
+    fcmServerKey: process.env.FCM_SERVER_KEY,
+    outboxBatchSize: parseInt(process.env.OUTBOX_BATCH_SIZE || '50', 10),
+    outboxPollIntervalMs: parseInt(process.env.OUTBOX_POLL_INTERVAL_MS || '5000', 10),
+    maxDeliveryAttempts: parseInt(process.env.NOTIFICATION_MAX_DELIVERY_ATTEMPTS || '3', 10),
+    retentionDays: parseInt(process.env.NOTIFICATION_RETENTION_DAYS || '90', 10),
+    encryptionKey:
+      process.env.NOTIFICATION_ENCRYPTION_KEY || 'innovent-secure-device-token-key-32ch!',
+  },
 });

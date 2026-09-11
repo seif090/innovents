@@ -157,6 +157,35 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ENABLE_SWAGGER: string = 'true';
+
+  // Notifications & Outbox
+  @IsString()
+  @IsOptional()
+  PUSH_PROVIDER: string = 'mock';
+
+  @IsString()
+  @IsOptional()
+  FCM_SERVER_KEY?: string;
+
+  @IsNumber()
+  @IsOptional()
+  OUTBOX_BATCH_SIZE: number = 50;
+
+  @IsNumber()
+  @IsOptional()
+  OUTBOX_POLL_INTERVAL_MS: number = 5000;
+
+  @IsNumber()
+  @IsOptional()
+  NOTIFICATION_MAX_DELIVERY_ATTEMPTS: number = 3;
+
+  @IsNumber()
+  @IsOptional()
+  NOTIFICATION_RETENTION_DAYS: number = 90;
+
+  @IsString()
+  @IsOptional()
+  NOTIFICATION_ENCRYPTION_KEY: string = 'innovent-secure-device-token-key-32ch!';
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {
