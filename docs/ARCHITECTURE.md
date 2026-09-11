@@ -89,3 +89,31 @@ When traffic justifies extracting a domain (e.g. Chat & Real-time in Sprint 5):
 1. The module's internal services become an independent NestJS application or microservice.
 2. In-process calls are migrated to gRPC or BullMQ event publishing.
 3. Database schemas remain normalized and can be partitioned to separate databases without redesigning business domain models.
+
+---
+
+## 6. Communities, Meetups & Social Layer Architecture (Sprint 4)
+
+### 6.1 Community Aggregate Design
+The Communities module (`src/modules/communities/`) provides an event-scoped social networking and mini-event layer:
+- **Free vs. Sponsored Communities:** Free communities are strictly capped at 20 members (`FREE_COMMUNITY_MAX_MEMBERS`), while Sponsored communities support enterprise scale with configurable capacity (default 100).
+- **Sub-domains:**
+  - **Memberships:** Role-based membership (`OWNER`, `MODERATOR`, `SPEAKER`, `MEMBER`) with status tracking (`ACTIVE`, `BANNED`, `LEFT`).
+  - **Posts & Feeds:** Rich content posts (10–2,000 characters) with media attachments and pinning support.
+  - **Threaded Nested Replies:** Self-referential reply tree structure (`parentId`) supporting arbitrary hierarchy.
+  - **Likes:** Idempotent toggle operations on posts and replies with atomic counter maintenance.
+  - **@Mentions:** Regex-extracted username mentions persisted for asynchronous notification triggers.
+  - **Mini Events / Meetups:** Localized community gatherings with date boundary checks against parent events and participant capacity controls.
+  - **Realtime Room Chat:** Ephemeral and persisted chat messaging scoped per community.
+
+### 6.2 Concurrency Locking Patterns
+To eliminate race conditions and prevent over-subscription under high concurrency:
+- **Member Join Serialization:** Row-level exclusive lock (`SELECT id, status, visibility, member_capacity, member_count FROM communities WHERE id = $1::uuid FOR UPDATE`) ensures member count checks and join actions are serialized.
+- **Meetup Attendance Serialization:** Row-level exclusive lock (`SELECT id, status, max_participants FROM community_meetups WHERE id = $1::uuid FOR UPDATE`) ensures meetup participant capacity limits are strictly enforced.
+
+### 6.3 Realtime WebSocket Gateway Architecture
+- **Namespace:** `/communities` powered by `@nestjs/websockets` and Socket.IO.
+- **Authentication:** Bearer JWT validated during connection handshake using `TokenService`. Unauthenticated sockets are rejected immediately (`disconnect(true)`).
+- **Room Authorization:** Socket joins (`join_community`) verify that the authenticated user is an active member of the target community before binding them to room `community:${communityId}`.
+- **Message Dispatch:** Chat messages received over WebSockets are validated, persisted to PostgreSQL via `CommunityChatService`, and broadcast in realtime to the community room (`new_message`).
+

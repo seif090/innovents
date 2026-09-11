@@ -16,6 +16,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
+import { CommunitiesModule } from './modules/communities/communities.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -52,6 +53,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     AuthModule,
     UsersModule,
     EventsModule,
+    CommunitiesModule,
     AuditModule,
     OutboxModule,
     HealthModule,

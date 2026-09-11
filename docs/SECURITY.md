@@ -132,3 +132,34 @@ INOVENT is designed with defense-in-depth principles. No single security control
 - Cancelled sessions and sessions belonging to unpublished/cancelled events are rejected from addition to personal schedules with `HTTP 409 Conflict`.
 - 15-minute BullMQ reminders use deterministic idempotent job IDs (`session-reminder:${userId}:${sessionId}`), preventing duplicate reminders upon schedule re-synchronization.
 
+---
+
+## 7. Communities, Meetups & Social Security Architecture (Sprint 4)
+
+### 7.1 Community Authorization & RBAC Hierarchy
+- Centralized `CommunityAuthorizationService` governs community and social resource operations:
+  - **ADMIN:** Universal platform administration override.
+  - **OWNER:** Community creator with full management, member role reassignment, and moderation rights.
+  - **MODERATOR:** Delegated community moderator capable of pinning/unpinning posts, deleting inappropriate content, and banning regular members.
+  - **SPEAKER:** Special recognition role with standard participation access.
+  - **MEMBER:** Verified active member with posting, replying, liking, and meetup participation rights.
+- **Moderation Escalation Protection:** Moderators cannot ban the community Owner or other Moderators. Only the Owner or platform Admin can ban moderators or reassign roles.
+
+### 7.2 Anti-Enumeration on Private Communities
+- Requests to fetch private or non-active communities (`GET /api/v1/communities/:id`) by unauthenticated callers or non-members return `HTTP 404 Not Found` (rather than `403 Forbidden`).
+- This completely prevents enumeration and probing attacks aimed at discovering private community IDs, internal corporate groups, or confidential discussion topics.
+
+### 7.3 Concurrency Control & Membership Capacity Enforcement
+- **Free Community 20-Member Limit:** Free communities are strictly capped at 20 members. Join requests acquire an exclusive row-level lock (`SELECT ... FOR UPDATE`) inside an interactive transaction. If `memberCount >= memberCapacity`, the request is rejected with `HTTP 409 Conflict`, guaranteeing zero race-condition over-subscription.
+- **Meetup Participant Limits:** Joining a meetup similarly locks the `community_meetups` row (`SELECT ... FOR UPDATE`) to strictly serialize participant limit checks and insertions.
+
+### 7.4 Realtime Chat Handshake Authentication & Room Boundary Enforcement
+- **WebSocket Handshake Validation:** Socket.IO connections on `/communities` require a valid JWT token in handshake authentication credentials (`auth.token` or `authorization` header). Sockets without valid signatures are instantly disconnected.
+- **Room Isolation:** Socket clients can only join rooms corresponding to communities where their database membership status is `ACTIVE`. Any attempt by non-members or banned users to join a community room or emit messages is rejected with authorization errors.
+
+### 7.5 Content Sanitization & Abuse Prevention
+- Post and reply payloads are strictly validated: content length constrained (posts: 10–2,000 characters; replies: 1–1,000 characters; chat: 1–2,000 characters).
+- Mention tokens (`@username`) are sanitized and validated against active database users before creating mention records.
+- Soft-deletion semantics are applied to posts, marking `status: DELETED` to preserve auditability while shielding content from the social feed.
+
+

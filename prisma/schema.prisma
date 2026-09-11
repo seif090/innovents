@@ -70,6 +70,17 @@ model User {
   eventRegistrations      EventRegistration[]
   sessionSchedules        UserSessionSchedule[]
   sessionNotes            UserSessionNote[]
+  createdCommunities      Community[]           @relation("CreatedCommunities")
+  communityMemberships    CommunityMember[]     @relation("CommunityMemberships")
+  communityPosts          CommunityPost[]       @relation("CommunityPosts")
+  communityReplies        CommunityPostReply[]  @relation("CommunityPostReplies")
+  communityPostLikes      CommunityPostLike[]   @relation("CommunityPostLikes")
+  communityReplyLikes     CommunityReplyLike[]  @relation("CommunityReplyLikes")
+  mentionsCreated         CommunityMention[]    @relation("MentionsCreated")
+  mentionsReceived        CommunityMention[]    @relation("MentionsReceived")
+  createdMeetups          CommunityMeetup[]     @relation("CreatedMeetups")
+  meetupParticipations    CommunityMeetupParticipant[] @relation("MeetupParticipations")
+  communityChatMessages   CommunityChatMessage[] @relation("CommunityChatMessages")
 
   @@index([email])
   @@index([status])
@@ -325,6 +336,8 @@ model Event {
   venues            Venue[]
   speakers          Speaker[]
   sessions          Session[]
+  communities       Community[]
+  meetups           CommunityMeetup[]
 
   @@index([ownerId])
   @@index([status])
@@ -483,5 +496,291 @@ model UserSessionNote {
   @@index([userId])
   @@index([sessionId])
   @@map("user_session_notes")
+}
+
+// ------------------------------------------------------------------------------
+// Sprint 4: Communities, Meetups, Posts, Replies, Likes, Mentions & Chat
+// ------------------------------------------------------------------------------
+
+enum CommunityType {
+  FREE
+  SPONSORED
+
+  @@map("community_type")
+}
+
+enum CommunityVisibility {
+  PUBLIC
+  PRIVATE
+
+  @@map("community_visibility")
+}
+
+enum CommunityStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+
+  @@map("community_status")
+}
+
+enum CommunityMemberRole {
+  OWNER
+  MODERATOR
+  SPEAKER
+  MEMBER
+
+  @@map("community_member_role")
+}
+
+enum CommunityMemberStatus {
+  ACTIVE
+  LEFT
+  BANNED
+
+  @@map("community_member_status")
+}
+
+enum CommunityPostStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+
+  @@map("community_post_status")
+}
+
+enum CommunityMeetupStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+
+  @@map("community_meetup_status")
+}
+
+model Community {
+  id             String              @id @default(uuid()) @db.Uuid
+  eventId        String              @map("event_id") @db.Uuid
+  createdById    String              @map("created_by_id") @db.Uuid
+  name           String              @db.VarChar(80)
+  bio            String              @db.VarChar(150)
+  description    String              @db.VarChar(1000)
+  category       String              @db.VarChar(50)
+  type           CommunityType       @default(FREE)
+  visibility     CommunityVisibility @default(PUBLIC)
+  status         CommunityStatus     @default(ACTIVE)
+  coverImageUrl  String?             @map("cover_image_url") @db.VarChar(500)
+  language       String?             @db.VarChar(20)
+  memberCapacity Int                 @default(20) @map("member_capacity")
+  memberCount    Int                 @default(1) @map("member_count")
+  isSponsored    Boolean             @default(false) @map("is_sponsored")
+  isPinned       Boolean             @default(false) @map("is_pinned")
+  deletedAt      DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  event          Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  creator        User                @relation("CreatedCommunities", fields: [createdById], references: [id], onDelete: Cascade)
+  members        CommunityMember[]
+  posts          CommunityPost[]
+  meetups        CommunityMeetup[]
+  chatMessages   CommunityChatMessage[]
+
+  @@index([eventId])
+  @@index([createdById])
+  @@index([status])
+  @@index([visibility])
+  @@index([type])
+  @@index([category])
+  @@index([deletedAt])
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String                @id @default(uuid()) @db.Uuid
+  communityId String                @map("community_id") @db.Uuid
+  userId      String                @map("user_id") @db.Uuid
+  role        CommunityMemberRole   @default(MEMBER)
+  status      CommunityMemberStatus @default(ACTIVE)
+  joinedAt    DateTime              @default(now()) @map("joined_at") @db.Timestamptz(6)
+  leftAt      DateTime?             @map("left_at") @db.Timestamptz(6)
+  bannedAt    DateTime?             @map("banned_at") @db.Timestamptz(6)
+  bannedBy    String?               @map("banned_by") @db.Uuid
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  community   Community             @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User                  @relation("CommunityMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId, status])
+  @@index([userId, status])
+  @@map("community_members")
+}
+
+model CommunityPost {
+  id          String              @id @default(uuid()) @db.Uuid
+  communityId String              @map("community_id") @db.Uuid
+  authorId    String              @map("author_id") @db.Uuid
+  content     String              @db.VarChar(2000)
+  attachments String[]            @default([])
+  linkUrl     String?             @map("link_url") @db.VarChar(500)
+  isPinned    Boolean             @default(false) @map("is_pinned")
+  status      CommunityPostStatus @default(PUBLISHED)
+  likeCount   Int                 @default(0) @map("like_count")
+  replyCount  Int                 @default(0) @map("reply_count")
+  deletedAt   DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  community   Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author      User                @relation("CommunityPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  replies     CommunityPostReply[]
+  likes       CommunityPostLike[]
+  mentions    CommunityMention[]
+
+  @@index([communityId])
+  @@index([authorId])
+  @@index([status])
+  @@index([isPinned])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("community_posts")
+}
+
+model CommunityPostReply {
+  id            String              @id @default(uuid()) @db.Uuid
+  postId        String              @map("post_id") @db.Uuid
+  authorId      String              @map("author_id") @db.Uuid
+  parentReplyId String?             @map("parent_reply_id") @db.Uuid
+  content       String              @db.VarChar(2000)
+  status        CommunityPostStatus @default(PUBLISHED)
+  likeCount     Int                 @default(0) @map("like_count")
+  deletedAt     DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  post          CommunityPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User                @relation("CommunityPostReplies", fields: [authorId], references: [id], onDelete: Cascade)
+  parentReply   CommunityPostReply? @relation("NestedReplies", fields: [parentReplyId], references: [id], onDelete: Cascade)
+  childReplies  CommunityPostReply[] @relation("NestedReplies")
+  likes         CommunityReplyLike[]
+  mentions      CommunityMention[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentReplyId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("community_post_replies")
+}
+
+model CommunityPostLike {
+  id        String        @id @default(uuid()) @db.Uuid
+  postId    String        @map("post_id") @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation("CommunityPostLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_post_likes")
+}
+
+model CommunityReplyLike {
+  id        String             @id @default(uuid()) @db.Uuid
+  replyId   String             @map("reply_id") @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  reply     CommunityPostReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  user      User               @relation("CommunityReplyLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([replyId, userId])
+  @@index([userId])
+  @@map("community_reply_likes")
+}
+
+model CommunityMention {
+  id              String              @id @default(uuid()) @db.Uuid
+  actorId         String              @map("actor_id") @db.Uuid
+  mentionedUserId String              @map("mentioned_user_id") @db.Uuid
+  postId          String?             @map("post_id") @db.Uuid
+  replyId         String?             @map("reply_id") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor           User                @relation("MentionsCreated", fields: [actorId], references: [id], onDelete: Cascade)
+  mentionedUser   User                @relation("MentionsReceived", fields: [mentionedUserId], references: [id], onDelete: Cascade)
+  post            CommunityPost?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reply           CommunityPostReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@index([mentionedUserId])
+  @@index([actorId])
+  @@index([postId])
+  @@index([replyId])
+  @@map("community_mentions")
+}
+
+model CommunityMeetup {
+  id               String                @id @default(uuid()) @db.Uuid
+  communityId      String                @map("community_id") @db.Uuid
+  eventId          String                @map("event_id") @db.Uuid
+  createdById      String                @map("created_by_id") @db.Uuid
+  title            String                @db.VarChar(100)
+  description      String                @db.VarChar(500)
+  startsAt         DateTime              @map("starts_at") @db.Timestamptz(6)
+  endsAt           DateTime?             @map("ends_at") @db.Timestamptz(6)
+  location         String                @db.VarChar(255)
+  mapUrl           String?               @map("map_url") @db.VarChar(500)
+  participantLimit Int?                  @map("participant_limit")
+  participantCount Int                   @default(1) @map("participant_count")
+  isPinned         Boolean               @default(true) @map("is_pinned")
+  status           CommunityMeetupStatus @default(SCHEDULED)
+  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  community        Community             @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  event            Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  creator          User                  @relation("CreatedMeetups", fields: [createdById], references: [id], onDelete: Cascade)
+  participants     CommunityMeetupParticipant[]
+
+  @@index([communityId])
+  @@index([eventId])
+  @@index([createdById])
+  @@index([startsAt])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("community_meetups")
+}
+
+model CommunityMeetupParticipant {
+  id        String          @id @default(uuid()) @db.Uuid
+  meetupId  String          @map("meetup_id") @db.Uuid
+  userId    String          @map("user_id") @db.Uuid
+  joinedAt  DateTime        @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  meetup    CommunityMeetup @relation(fields: [meetupId], references: [id], onDelete: Cascade)
+  user      User            @relation("MeetupParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([meetupId, userId])
+  @@index([userId])
+  @@map("community_meetup_participants")
+}
+
+model CommunityChatMessage {
+  id          String    @id @default(uuid()) @db.Uuid
+  communityId String    @map("community_id") @db.Uuid
+  senderId    String    @map("sender_id") @db.Uuid
+  content     String    @db.VarChar(2000)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  sender      User      @relation("CommunityChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([communityId, createdAt])
+  @@index([senderId])
+  @@map("community_chat_messages")
 }
 
