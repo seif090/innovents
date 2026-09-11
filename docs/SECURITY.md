@@ -97,3 +97,38 @@ INOVENT is designed with defense-in-depth principles. No single security control
 3. **Soft Deletion:** Deletion sets `deletedAt: new Date()`, deactivates account status, and revokes all active refresh tokens.
 4. **Sensitive Logs Sanitization:** Passwords, OTP codes, authorization tokens, and credentials are strictly excluded from API responses, database queries, and structured logs.
 
+---
+
+## 6. Events, Agenda & Sessions Security Architecture (Sprint 3)
+
+### 6.1 Multi-Tier Event Management Authorization
+- Centralized `EventAuthorizationService` enforces access control on event management endpoints:
+  - **ADMIN:** Universal supervisory override.
+  - **EVENT_OWNER:** The creator and owner of the event record (`event.ownerId === userId`).
+  - **ORGANIZER:** A co-organizer explicitly assigned to the event in `event_organizers`.
+- Any modification (PATCH event, POST session, DELETE venue, etc.) by an unassigned user or regular attendee is rejected with `HTTP 403 Forbidden`.
+
+### 6.2 Anti-Enumeration & Access Shielding on Non-Public Events
+- Non-public events (`visibility: PRIVATE` or `status: DRAFT / CANCELLED`) return `HTTP 404 Not Found` rather than `403 Forbidden` to unauthenticated or unauthorized users.
+- This prevents malicious actors from enumerating unreleased event UUIDs, discovering tentative conference dates, or leaking confidential speaker/venue data.
+- Optional Bearer token parsing in `JwtAuthGuard` allows authorized managers to inspect private drafts via `/events/:id` while unauthenticated callers receive 404.
+
+### 6.3 Concurrency Control & Race Condition Prevention
+- **Event Capacity Enforcement:** During registration, an interactive database transaction locks the parent `Event` row using `SELECT id, capacity, status, deleted_at, ends_at FROM events WHERE id = $1 FOR UPDATE`. This guarantees strictly serialized counting and registration creation, eliminating over-subscription race conditions.
+- **Venue Schedule Overlap Serialization:** Creating or updating a session locks the associated `Venue` row (`SELECT id FROM venues WHERE id = $1 FOR UPDATE`), guaranteeing that concurrent scheduling requests cannot place overlapping sessions in the same physical room.
+
+### 6.4 Event Registration State Machine & Re-registration
+- Attendee registrations enforce `@@unique([eventId, userId])`.
+- Re-registration after previous cancellation reactivates the existing record (`status = REGISTERED`, `cancelledAt = null`, `registeredAt = now()`) atomically under the exclusive event capacity lock, preventing duplicate key database panics.
+- Capacity overflow or duplicate registrations strictly return `HTTP 409 Conflict`.
+
+### 6.5 Referential Integrity & Deletion Guards
+- Deleting a `Venue` with active sessions is blocked with `HTTP 409 Conflict`.
+- Deleting a `Speaker` assigned to active sessions is blocked with `HTTP 409 Conflict`.
+- Modifying event start/end dates validates all existing sessions; if any session falls outside the proposed boundary, the update is rejected with `HTTP 400 Bad Request`.
+
+### 6.6 Personal Attendee Schedules & Reminder Idempotency
+- Personal session schedules and notes are strictly scoped to the authenticated attendee (`userId` from verified JWT). Cross-user schedule access is impossible.
+- Cancelled sessions and sessions belonging to unpublished/cancelled events are rejected from addition to personal schedules with `HTTP 409 Conflict`.
+- 15-minute BullMQ reminders use deterministic idempotent job IDs (`session-reminder:${userId}:${sessionId}`), preventing duplicate reminders upon schedule re-synchronization.
+

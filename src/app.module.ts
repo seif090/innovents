@@ -15,6 +15,7 @@ import { OutboxModule } from './modules/outbox/outbox.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { EventsModule } from './modules/events/events.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -50,6 +51,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     // Domain & System Modules
     AuthModule,
     UsersModule,
+    EventsModule,
     AuditModule,
     OutboxModule,
     HealthModule,

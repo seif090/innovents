@@ -78,6 +78,12 @@ async function bootstrap() {
         'Registration, OTP verification, login, refresh, logout, password reset',
       )
       .addTag('Users', 'User identity profiles and account management')
+      .addTag('Events', 'Event aggregate management, discovery, and publishing')
+      .addTag('Event Registrations', 'Attendee event registration and capacity management')
+      .addTag('Agenda & Sessions', 'Event agenda, sessions timeline, and reordering')
+      .addTag('Speakers', 'Event speaker profiles and assignments')
+      .addTag('Venues', 'Event halls, rooms, and venue management')
+      .addTag('Attendee Schedules', 'Personal session schedule and private notes')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
