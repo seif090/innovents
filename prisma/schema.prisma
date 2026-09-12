@@ -125,6 +125,10 @@ model User {
   sponsorships                 CommunitySponsorship[] @relation("UserSponsorships")
   subscriptions                Subscription[]        @relation("UserSubscriptions")
 
+  // Sprint 10: Content Moderation & Reporting Relations
+  reportsSubmitted             Report[]              @relation("UserReports")
+  reportsResolved              Report[]              @relation("ResolvedReports")
+
   @@index([email])
   @@index([status])
   @@index([createdAt])
@@ -1815,3 +1819,56 @@ model StripeWebhookEvent {
   @@index([processingStatus])
   @@map("stripe_webhook_events")
 }
+
+// ------------------------------------------------------------------------------
+// Sprint 10: Content Moderation & Reporting System
+// ------------------------------------------------------------------------------
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+
+  @@map("report_status")
+}
+
+enum ReportTargetType {
+  COMMUNITY_POST
+  COMMUNITY_REPLY
+  COMMUNITY_MEETUP
+  COMMUNITY_CHAT_MESSAGE
+  EVENT
+  COMMUNITY
+  SPONSOR_AD
+  C2B_SERVICE
+  VENDOR_SERVICE
+  USER
+
+  @@map("report_target_type")
+}
+
+model Report {
+  id               String           @id @default(uuid()) @db.Uuid
+  reporterId       String           @map("reporter_id") @db.Uuid
+  targetType       ReportTargetType @map("target_type")
+  targetId         String           @map("target_id") @db.Uuid
+  reason           String           @db.VarChar(100)
+  description      String?          @db.VarChar(1000)
+  status           ReportStatus     @default(OPEN)
+  resolvedByUserId String?          @map("resolved_by_user_id") @db.Uuid
+  resolvedAt       DateTime?        @map("resolved_at") @db.Timestamptz(6)
+  resolutionNote   String?          @map("resolution_note") @db.VarChar(1000)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reporter         User             @relation("UserReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy       User?            @relation("ResolvedReports", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reports")
+}
+

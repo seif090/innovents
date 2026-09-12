@@ -26,6 +26,8 @@ import { OrganizerInvitationsModule } from './modules/organizer-invitations/orga
 import { B2bMarketplaceModule } from './modules/b2b-marketplace/b2b-marketplace.module';
 import { C2bMarketplaceModule } from './modules/c2b-marketplace/c2b-marketplace.module';
 import { SponsorAdsModule } from './modules/sponsor-ads/sponsor-ads.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -72,6 +74,8 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     SponsorAdsModule,
     PaymentsModule,
     SubscriptionsModule,
+    AdminModule,
+    ReportsModule,
     AuditModule,
     OutboxModule,
     HealthModule,
