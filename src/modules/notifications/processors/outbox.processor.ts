@@ -528,6 +528,104 @@ export class OutboxProcessor {
         break;
       }
 
+      case 'C2B_BOOKING_REQUESTED': {
+        const providerId = payload.providerId as string;
+        const serviceName = (payload.serviceName as string) || 'Service';
+        if (providerId) {
+          await this.orchestrator.orchestrate({
+            userId: providerId,
+            type: NotificationType.C2B_BOOKING_REQUESTED,
+            title: 'New Booking Request',
+            body: `You have received a new booking request for "${serviceName}"`,
+            data: payload,
+            idempotencyKey: `c2b-booking-req:${event.aggregate_id}:${providerId}`,
+          });
+        }
+        break;
+      }
+
+      case 'C2B_BOOKING_STATUS_CHANGED': {
+        const attendeeId = payload.attendeeId as string;
+        const status = (payload.status as string) || 'UPDATED';
+        const serviceName = (payload.serviceName as string) || 'Service';
+        if (attendeeId) {
+          await this.orchestrator.orchestrate({
+            userId: attendeeId,
+            type: NotificationType.C2B_BOOKING_STATUS_CHANGED,
+            title: 'Booking Request Updated',
+            body: `Your booking request for "${serviceName}" is now ${status}`,
+            data: payload,
+            idempotencyKey: `c2b-booking-status:${event.aggregate_id}:${status}`,
+          });
+        }
+        break;
+      }
+
+      case 'SPONSOR_AD_SUBMITTED': {
+        const adminId = payload.adminId as string;
+        const title = (payload.title as string) || 'Sponsor Ad';
+        if (adminId) {
+          await this.orchestrator.orchestrate({
+            userId: adminId,
+            type: NotificationType.SPONSOR_AD_SUBMITTED,
+            title: 'Sponsor Ad Submitted for Review',
+            body: `New ad "${title}" submitted and awaiting moderation`,
+            data: payload,
+            idempotencyKey: `sponsor-ad-submitted:${event.aggregate_id}:${adminId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SPONSOR_AD_APPROVED': {
+        const sponsorId = payload.sponsorId as string;
+        const title = (payload.title as string) || 'Sponsor Ad';
+        if (sponsorId) {
+          await this.orchestrator.orchestrate({
+            userId: sponsorId,
+            type: NotificationType.SPONSOR_AD_APPROVED,
+            title: 'Sponsor Ad Approved',
+            body: `Your ad "${title}" has been approved for publication`,
+            data: payload,
+            idempotencyKey: `sponsor-ad-approved:${event.aggregate_id}:${sponsorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SPONSOR_AD_REJECTED': {
+        const sponsorId = payload.sponsorId as string;
+        const title = (payload.title as string) || 'Sponsor Ad';
+        const reason = (payload.reason as string) || 'Policy violation';
+        if (sponsorId) {
+          await this.orchestrator.orchestrate({
+            userId: sponsorId,
+            type: NotificationType.SPONSOR_AD_REJECTED,
+            title: 'Sponsor Ad Rejected',
+            body: `Your ad "${title}" was not approved: ${reason}`,
+            data: payload,
+            idempotencyKey: `sponsor-ad-rejected:${event.aggregate_id}:${sponsorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'COUPON_REDEEMED': {
+        const providerId = payload.providerId as string;
+        const code = (payload.code as string) || 'Coupon';
+        if (providerId) {
+          await this.orchestrator.orchestrate({
+            userId: providerId,
+            type: NotificationType.COUPON_REDEEMED,
+            title: 'Coupon Redeemed',
+            body: `Promotional coupon "${code}" was redeemed`,
+            data: payload,
+            idempotencyKey: `coupon-redeemed:${event.aggregate_id}:${providerId}`,
+          });
+        }
+        break;
+      }
+
       default:
         this.logger.debug(`Ignored outbox event type: ${event.event_type}`);
         break;

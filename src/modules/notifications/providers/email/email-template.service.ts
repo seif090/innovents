@@ -66,6 +66,18 @@ export class EmailTemplateService {
         return this.renderRfqCancelled(context, lang, recipientName);
       case NotificationType.RFQ_EXPIRED:
         return this.renderRfqExpired(context, lang, recipientName);
+      case NotificationType.C2B_BOOKING_REQUESTED:
+        return this.renderC2bBookingRequested(context, lang, recipientName);
+      case NotificationType.C2B_BOOKING_STATUS_CHANGED:
+        return this.renderC2bBookingStatusChanged(context, lang, recipientName);
+      case NotificationType.SPONSOR_AD_SUBMITTED:
+        return this.renderSponsorAdSubmitted(context, lang, recipientName);
+      case NotificationType.SPONSOR_AD_APPROVED:
+        return this.renderSponsorAdApproved(context, lang, recipientName);
+      case NotificationType.SPONSOR_AD_REJECTED:
+        return this.renderSponsorAdRejected(context, lang, recipientName);
+      case NotificationType.COUPON_REDEEMED:
+        return this.renderCouponRedeemed(context, lang, recipientName);
       default:
         return this.renderDefaultNotification(context, lang, recipientName);
     }
@@ -727,6 +739,196 @@ export class EmailTemplateService {
       `<h2>RFQ Expired</h2>
        <p>Hello <strong>${recipientName}</strong>,</p>
        <p>The deadline for request for quotation <strong>"${title || 'RFQ'}"</strong> has passed and it is now expired.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderC2bBookingRequested(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const serviceName = (ctx.data?.serviceName as string) || ctx.title || 'C2B Service';
+    const attendeeName = (ctx.data?.attendeeName as string) || 'An attendee';
+
+    if (lang === 'ar') {
+      const subject = `طلب حجز جديد: ${serviceName}`;
+      const text = `مرحباً ${recipientName}،\n\nتلقيت طلب حجز جديد من ${attendeeName} لخدمتك: "${serviceName}".\n\nيرجى مراجعة الطلب في لوحة التحكم.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>طلب حجز جديد</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تلقيت طلب حجز جديد لخدمتك <strong>"${serviceName}"</strong> من قبل <strong>${attendeeName}</strong>.</p>
+         <p>يرجى التوجه إلى بوابة الخدمات لمراجعة التفاصيل والرد على العميل.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `New Booking Request: ${serviceName}`;
+    const text = `Hello ${recipientName},\n\nYou have received a new booking request from ${attendeeName} for "${serviceName}".\n\nPlease review it in your provider portal.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>New Booking Request</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>You have received a new booking request for your service <strong>"${serviceName}"</strong> from <strong>${attendeeName}</strong>.</p>
+       <p>Please log in to your provider dashboard to view details and respond.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderC2bBookingStatusChanged(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const serviceName = (ctx.data?.serviceName as string) || 'Service';
+    const status = (ctx.data?.status as string) || 'UPDATED';
+
+    if (lang === 'ar') {
+      const subject = `تحديث حالة طلب الحجز: ${serviceName}`;
+      const text = `مرحباً ${recipientName}،\n\nتم تحديث حالة طلبك لخدمة "${serviceName}" إلى: ${status}.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تحديث حالة طلب الحجز</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم تحديث حالة طلبك لخدمة <strong>"${serviceName}"</strong> إلى: <strong>${status}</strong>.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Booking Request Update: ${serviceName}`;
+    const text = `Hello ${recipientName},\n\nYour booking request for "${serviceName}" has been updated to: ${status}.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Booking Status Update</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your booking request for <strong>"${serviceName}"</strong> has been updated to: <strong>${status}</strong>.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSponsorAdSubmitted(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const title = (ctx.data?.title as string) || ctx.title || 'Sponsor Ad';
+
+    if (lang === 'ar') {
+      const subject = `تم استلام إعلان راعٍ للمراجعة: ${title}`;
+      const text = `مرحباً ${recipientName}،\n\nتم تقديم إعلان جديد بعنوان "${title}" للمراجعة والاعتماد.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>إعلان راعٍ قيد المراجعة</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم تقديم إعلان جديد بعنوان <strong>"${title}"</strong> للمراجعة والاعتماد.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `New Sponsor Ad Submitted for Review: ${title}`;
+    const text = `Hello ${recipientName},\n\nA new sponsor ad "${title}" has been submitted for moderation review.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Sponsor Ad Submitted for Review</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>A new sponsor ad <strong>"${title}"</strong> has been submitted and is pending administrator review.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSponsorAdApproved(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const title = (ctx.data?.title as string) || ctx.title || 'Sponsor Ad';
+
+    if (lang === 'ar') {
+      const subject = `تمت الموافقة على إعلانك: ${title}`;
+      const text = `مرحباً ${recipientName}،\n\nيسرنا إبلاغك بأنه تمت الموافقة على إعلانك "${title}".\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تمت الموافقة على الإعلان</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>يسعدنا إبلاغك بأنه تمت الموافقة على إعلانك <strong>"${title}"</strong> وأصبح مؤهلاً للنشر.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Sponsor Ad Approved: ${title}`;
+    const text = `Hello ${recipientName},\n\nGreat news! Your ad "${title}" has been approved.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Sponsor Ad Approved</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Great news! Your ad <strong>"${title}"</strong> has been approved by our review team.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSponsorAdRejected(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const title = (ctx.data?.title as string) || ctx.title || 'Sponsor Ad';
+    const reason = (ctx.data?.reason as string) || 'Does not meet platform guidelines';
+
+    if (lang === 'ar') {
+      const subject = `تحديث بشأن إعلانك: ${title}`;
+      const text = `مرحباً ${recipientName}،\n\nللأسف، لم تتم الموافقة على إعلانك "${title}".\nالسبب: ${reason}\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تحديث بشأن إعلان الراعي</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>للأسف، لم تتم الموافقة على إعلانك <strong>"${title}"</strong>.</p>
+         <blockquote>${reason}</blockquote>
+         <p>يرجى تعديل الإعلان وإعادة تقديمه.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Sponsor Ad Update: Action Required on ${title}`;
+    const text = `Hello ${recipientName},\n\nYour ad "${title}" was not approved.\nReason: ${reason}\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Sponsor Ad Not Approved</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your ad <strong>"${title}"</strong> was reviewed and not approved for the following reason:</p>
+       <blockquote>${reason}</blockquote>
+       <p>Please update the content and re-submit for review.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderCouponRedeemed(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const code = (ctx.data?.code as string) || ctx.title || 'Coupon';
+    const attendeeName = (ctx.data?.attendeeName as string) || 'An attendee';
+
+    if (lang === 'ar') {
+      const subject = `تم استخدام كوبون: ${code}`;
+      const text = `مرحباً ${recipientName}،\n\nتم استخدام الكوبون "${code}" بواسطة ${attendeeName}.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>استخدام كوبون خصم</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم استخدام كوبون الخصم <strong>"${code}"</strong> بنجاح بواسطة <strong>${attendeeName}</strong>.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Coupon Redeemed: ${code}`;
+    const text = `Hello ${recipientName},\n\nYour coupon "${code}" was redeemed by ${attendeeName}.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Coupon Redeemed</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your promotional coupon <strong>"${code}"</strong> has been redeemed by <strong>${attendeeName}</strong>.</p>`,
       'en',
     );
     return { subject, html, text };

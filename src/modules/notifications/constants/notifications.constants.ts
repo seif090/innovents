@@ -30,6 +30,10 @@ export const NOTIFICATION_SECURITY_TYPES: ReadonlySet<NotificationType> = new Se
     NotificationType.RFQ_ACCEPTED,
     NotificationType.RFQ_REJECTED,
     NotificationType.RFQ_CANCELLED,
+    NotificationType.C2B_BOOKING_REQUESTED,
+    NotificationType.C2B_BOOKING_STATUS_CHANGED,
+    NotificationType.SPONSOR_AD_APPROVED,
+    NotificationType.SPONSOR_AD_REJECTED,
   ],
 );
 
@@ -68,6 +72,12 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<NotificationType, DefaultP
   [NotificationType.RFQ_REJECTED]: { inApp: true, push: true, email: true },
   [NotificationType.RFQ_CANCELLED]: { inApp: true, push: true, email: true },
   [NotificationType.RFQ_EXPIRED]: { inApp: true, push: true, email: false },
+  [NotificationType.C2B_BOOKING_REQUESTED]: { inApp: true, push: true, email: true },
+  [NotificationType.C2B_BOOKING_STATUS_CHANGED]: { inApp: true, push: true, email: true },
+  [NotificationType.SPONSOR_AD_SUBMITTED]: { inApp: true, push: false, email: true },
+  [NotificationType.SPONSOR_AD_APPROVED]: { inApp: true, push: true, email: true },
+  [NotificationType.SPONSOR_AD_REJECTED]: { inApp: true, push: true, email: true },
+  [NotificationType.COUPON_REDEEMED]: { inApp: true, push: false, email: true },
 };
 
 export const NOTIFICATION_OUTBOX_EVENTS = {

@@ -46,6 +46,13 @@ async function main() {
     { action: 'manage', resource: 'vendor_service', description: 'Manage vendor services' },
     { action: 'manage', resource: 'rfq', description: 'Manage RFQs' },
     { action: 'manage', resource: 'quotation', description: 'Manage Quotations' },
+    { action: 'manage', resource: 'c2b_service', description: 'Manage C2B provider services' },
+    { action: 'create', resource: 'c2b_booking', description: 'Create C2B booking requests' },
+    { action: 'manage', resource: 'c2b_booking', description: 'Manage C2B booking requests' },
+    { action: 'manage', resource: 'coupon', description: 'Manage provider coupons' },
+    { action: 'redeem', resource: 'coupon', description: 'Redeem provider coupons' },
+    { action: 'manage', resource: 'sponsor_ad', description: 'Create and manage sponsor ads' },
+    { action: 'review', resource: 'sponsor_ad', description: 'Review and moderate sponsor ads' },
   ];
 
   for (const perm of permissions) {

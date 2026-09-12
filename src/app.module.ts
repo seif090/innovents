@@ -22,6 +22,8 @@ import { BusinessProfilesModule } from './modules/business-profiles/business-pro
 import { AdminApprovalsModule } from './modules/admin-approvals/admin-approvals.module';
 import { OrganizerInvitationsModule } from './modules/organizer-invitations/organizer-invitations.module';
 import { B2bMarketplaceModule } from './modules/b2b-marketplace/b2b-marketplace.module';
+import { C2bMarketplaceModule } from './modules/c2b-marketplace/c2b-marketplace.module';
+import { SponsorAdsModule } from './modules/sponsor-ads/sponsor-ads.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -64,6 +66,8 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     AdminApprovalsModule,
     OrganizerInvitationsModule,
     B2bMarketplaceModule,
+    C2bMarketplaceModule,
+    SponsorAdsModule,
     AuditModule,
     OutboxModule,
     HealthModule,
