@@ -103,6 +103,13 @@ model User {
   createdOrganizerInvitations  OrganizerInvitation[] @relation("CreatedOrganizerInvitations")
   acceptedOrganizerInvitations OrganizerInvitation[] @relation("AcceptedOrganizerInvitations")
 
+  // Sprint 7: B2B Marketplace Relations
+  vendorServices               VendorService[]       @relation("VendorServices")
+  sentRfqs                     Rfq[]                 @relation("SentRfqs")
+  receivedRfqs                 Rfq[]                 @relation("ReceivedRfqs")
+  vendorQuotations             Quotation[]           @relation("VendorQuotations")
+  rfqClarifications            RfqClarification[]
+
   @@index([email])
   @@index([status])
   @@index([createdAt])
@@ -362,6 +369,7 @@ model Event {
   communities       Community[]
   meetups           CommunityMeetup[]
   organizerInvitations OrganizerInvitation[]
+  rfqs                 Rfq[]
 
   @@index([ownerId])
   @@index([status])
@@ -838,6 +846,14 @@ enum NotificationType {
   ACCOUNT_SUSPENDED
   ORGANIZER_INVITATION_CREATED
   ORGANIZER_INVITATION_ACCEPTED
+  RFQ_SENT
+  RFQ_VIEWED
+  RFQ_CLARIFICATION_REQUESTED
+  RFQ_QUOTED
+  RFQ_ACCEPTED
+  RFQ_REJECTED
+  RFQ_CANCELLED
+  RFQ_EXPIRED
 
   @@map("notification_type")
 }
@@ -1151,6 +1167,185 @@ model OrganizerInvitation {
   @@index([tokenHash])
   @@index([expiresAt])
   @@map("organizer_invitations")
+}
+
+// ------------------------------------------------------------------------------
+// Sprint 7: B2B Marketplace, Vendor Services, RFQ & Quotations Workflow
+// ------------------------------------------------------------------------------
+
+enum PricingModel {
+  FIXED
+  HOURLY
+  DAILY
+  PER_UNIT
+  CUSTOM
+
+  @@map("pricing_model")
+}
+
+enum RfqStatus {
+  DRAFT
+  SENT
+  VIEWED
+  CLARIFICATION_REQUESTED
+  QUOTED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+
+  @@map("rfq_status")
+}
+
+enum QuotationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+
+  @@map("quotation_status")
+}
+
+model VendorService {
+  id               String       @id @default(uuid()) @db.Uuid
+  vendorId         String       @map("vendor_id") @db.Uuid
+  name             String       @db.VarChar(200)
+  description      String       @db.Text
+  category         String       @db.VarChar(100)
+  pricingModel     PricingModel @default(FIXED) @map("pricing_model")
+  price            Decimal      @default(0) @db.Decimal(12, 2)
+  currency         String       @default("SAR") @db.VarChar(3)
+  deliveryDuration String       @map("delivery_duration") @db.VarChar(100)
+  serviceAreas     String[]     @default([]) @map("service_areas")
+  tags             String[]     @default([])
+  minimumOrder     Int          @default(1) @map("minimum_order")
+  isActive         Boolean      @default(true) @map("is_active")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  vendor           User         @relation("VendorServices", fields: [vendorId], references: [id], onDelete: Cascade)
+  rfqItems         RfqItem[]
+
+  @@index([vendorId, isActive])
+  @@index([category, isActive])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("vendor_services")
+}
+
+model Rfq {
+  id                 String             @id @default(uuid()) @db.Uuid
+  sponsorId          String             @map("sponsor_id") @db.Uuid
+  vendorId           String             @map("vendor_id") @db.Uuid
+  eventId            String?            @map("event_id") @db.Uuid
+  title              String             @db.VarChar(200)
+  description        String             @db.Text
+  requirements       String?            @db.Text
+  status             RfqStatus          @default(DRAFT)
+  expiresAt          DateTime           @map("expires_at") @db.Timestamptz(6)
+  sentAt             DateTime?          @map("sent_at") @db.Timestamptz(6)
+  viewedAt           DateTime?          @map("viewed_at") @db.Timestamptz(6)
+  cancelledAt        DateTime?          @map("cancelled_at") @db.Timestamptz(6)
+  acceptedAt         DateTime?          @map("accepted_at") @db.Timestamptz(6)
+  rejectedAt         DateTime?          @map("rejected_at") @db.Timestamptz(6)
+  cancellationReason String?            @map("cancellation_reason") @db.Text
+  rejectionReason    String?            @map("rejection_reason") @db.Text
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sponsor            User               @relation("SentRfqs", fields: [sponsorId], references: [id], onDelete: Cascade)
+  vendor             User               @relation("ReceivedRfqs", fields: [vendorId], references: [id], onDelete: Cascade)
+  event              Event?             @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  items              RfqItem[]
+  clarifications     RfqClarification[]
+  quotations         Quotation[]
+
+  @@index([sponsorId, createdAt])
+  @@index([vendorId, status, createdAt])
+  @@index([status, expiresAt])
+  @@map("rfqs")
+}
+
+model RfqItem {
+  id              String         @id @default(uuid()) @db.Uuid
+  rfqId           String         @map("rfq_id") @db.Uuid
+  vendorServiceId String?        @map("vendor_service_id") @db.Uuid
+  description     String         @db.Text
+  quantity        Int            @default(1)
+  unit            String?        @db.VarChar(50)
+  targetPrice     Decimal?       @map("target_price") @db.Decimal(12, 2)
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rfq             Rfq            @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorService   VendorService? @relation(fields: [vendorServiceId], references: [id], onDelete: SetNull)
+  quotationItems  QuotationItem[]
+
+  @@index([rfqId])
+  @@map("rfq_items")
+}
+
+model RfqClarification {
+  id        String   @id @default(uuid()) @db.Uuid
+  rfqId     String   @map("rfq_id") @db.Uuid
+  senderId  String   @map("sender_id") @db.Uuid
+  message   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rfq       Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([rfqId, createdAt])
+  @@map("rfq_clarifications")
+}
+
+model Quotation {
+  id              String          @id @default(uuid()) @db.Uuid
+  rfqId           String          @map("rfq_id") @db.Uuid
+  vendorId        String          @map("vendor_id") @db.Uuid
+  version         Int             @default(1)
+  status          QuotationStatus @default(PENDING)
+  subtotal        Decimal         @db.Decimal(12, 2)
+  tax             Decimal         @default(0) @db.Decimal(12, 2)
+  discount        Decimal         @default(0) @db.Decimal(12, 2)
+  total           Decimal         @db.Decimal(12, 2)
+  currency        String          @default("SAR") @db.VarChar(3)
+  validUntil      DateTime        @map("valid_until") @db.Timestamptz(6)
+  notes           String?         @db.Text
+  acceptedAt      DateTime?       @map("accepted_at") @db.Timestamptz(6)
+  rejectedAt      DateTime?       @map("rejected_at") @db.Timestamptz(6)
+  rejectionReason String?         @map("rejection_reason") @db.Text
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rfq             Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor          User            @relation("VendorQuotations", fields: [vendorId], references: [id], onDelete: Cascade)
+  items           QuotationItem[]
+
+  @@unique([rfqId, version])
+  @@index([rfqId, status])
+  @@index([vendorId, createdAt])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  quotationId String    @map("quotation_id") @db.Uuid
+  rfqItemId   String?   @map("rfq_item_id") @db.Uuid
+  description String    @db.Text
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(12, 2)
+  total       Decimal   @db.Decimal(12, 2)
+  notes       String?   @db.Text
+
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  rfqItem     RfqItem?  @relation(fields: [rfqItemId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+  @@map("quotation_items")
 }
 
 

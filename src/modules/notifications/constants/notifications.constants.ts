@@ -25,6 +25,11 @@ export const NOTIFICATION_SECURITY_TYPES: ReadonlySet<NotificationType> = new Se
     NotificationType.ACCOUNT_APPROVED,
     NotificationType.ORGANIZER_INVITATION_CREATED,
     NotificationType.ORGANIZER_INVITATION_ACCEPTED,
+    NotificationType.RFQ_SENT,
+    NotificationType.RFQ_QUOTED,
+    NotificationType.RFQ_ACCEPTED,
+    NotificationType.RFQ_REJECTED,
+    NotificationType.RFQ_CANCELLED,
   ],
 );
 
@@ -55,6 +60,14 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<NotificationType, DefaultP
   [NotificationType.ACCOUNT_SUSPENDED]: { inApp: true, push: true, email: true },
   [NotificationType.ORGANIZER_INVITATION_CREATED]: { inApp: true, push: true, email: true },
   [NotificationType.ORGANIZER_INVITATION_ACCEPTED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_SENT]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_VIEWED]: { inApp: true, push: false, email: false },
+  [NotificationType.RFQ_CLARIFICATION_REQUESTED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_QUOTED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_ACCEPTED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_REJECTED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_CANCELLED]: { inApp: true, push: true, email: true },
+  [NotificationType.RFQ_EXPIRED]: { inApp: true, push: true, email: false },
 };
 
 export const NOTIFICATION_OUTBOX_EVENTS = {

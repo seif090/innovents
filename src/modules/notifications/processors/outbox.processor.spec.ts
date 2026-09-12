@@ -140,4 +140,33 @@ describe('OutboxProcessor', () => {
       }),
     });
   });
+
+  it('should process RFQ_SENT outbox event and notify vendor', async () => {
+    prisma.outboxEvent.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'outbox-rfq',
+        event_type: 'RFQ_SENT',
+        aggregate_type: 'rfq',
+        aggregate_id: 'rfq-1',
+        payload: {
+          vendorId: 'vendor-1',
+          sponsorId: 'sponsor-1',
+          title: 'Lighting Rig',
+        },
+        attempts: 0,
+      },
+    ]);
+
+    const count = await processor.processBatch();
+
+    expect(count).toBe(1);
+    expect(orchestrator.orchestrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'vendor-1',
+        type: NotificationType.RFQ_SENT,
+        idempotencyKey: 'rfq-sent:rfq-1:vendor-1',
+      }),
+    );
+  });
 });

@@ -52,6 +52,20 @@ export class EmailTemplateService {
         return this.renderOrganizerInvitation(context, lang, recipientName);
       case NotificationType.ORGANIZER_INVITATION_ACCEPTED:
         return this.renderOrganizerInvitationAccepted(context, lang, recipientName);
+      case NotificationType.RFQ_SENT:
+        return this.renderRfqSent(context, lang, recipientName);
+      case NotificationType.RFQ_CLARIFICATION_REQUESTED:
+        return this.renderRfqClarification(context, lang, recipientName);
+      case NotificationType.RFQ_QUOTED:
+        return this.renderRfqQuoted(context, lang, recipientName);
+      case NotificationType.RFQ_ACCEPTED:
+        return this.renderRfqAccepted(context, lang, recipientName);
+      case NotificationType.RFQ_REJECTED:
+        return this.renderRfqRejected(context, lang, recipientName);
+      case NotificationType.RFQ_CANCELLED:
+        return this.renderRfqCancelled(context, lang, recipientName);
+      case NotificationType.RFQ_EXPIRED:
+        return this.renderRfqExpired(context, lang, recipientName);
       default:
         return this.renderDefaultNotification(context, lang, recipientName);
     }
@@ -482,6 +496,240 @@ export class EmailTemplateService {
         'en',
       ),
     };
+  }
+
+  private renderRfqSent(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const title = (ctx.data?.title as string) || ctx.title || 'Service Request';
+    const expiresAt = (ctx.data?.expiresAt as string) || '';
+
+    if (lang === 'ar') {
+      const subject = `طلب عرض أسعار جديد: ${title}`;
+      const text = `مرحباً ${recipientName}،\n\nلقد استلمت طلب عرض أسعار جديد (RFQ) بعنوان "${title}".\nتاريخ انتهاء الصلاحية: ${expiresAt}\n\nيرجى مراجعة تفاصيل الطلب وتقديم عرض الأسعار عبر البوابة.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>طلب عرض أسعار جديد (RFQ)</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>لقد استلم حسابك التجاري طلب عرض أسعار جديد للمشروع <strong>"${title}"</strong>.</p>
+         <p><strong>تاريخ انتهاء الطلب:</strong> ${expiresAt}</p>
+         <p>يرجى تسجيل الدخول إلى منصة إينوفنت للاطلاع على بنود الطلب وتقديم عرض الأسعار المناسب.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `New Request for Quotation: ${title}`;
+    const text = `Hello ${recipientName},\n\nYou have received a new Request for Quotation (RFQ) for "${title}".\nExpires at: ${expiresAt}\n\nPlease review the line items and submit your quote through the portal.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>New Request for Quotation (RFQ)</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your business has received a new Request for Quotation for <strong>"${title}"</strong>.</p>
+       <p><strong>Expiration Date:</strong> ${expiresAt}</p>
+       <p>Please log in to INOVENT B2B portal to review specifications and submit your formal quotation.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqClarification(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const message = (ctx.data?.message as string) || ctx.body || '';
+
+    if (lang === 'ar') {
+      const subject = 'استفسار توضيحي جديد حول طلب عرض الأسعار';
+      const text = `مرحباً ${recipientName}،\n\nتم إرسال استفسار توضيحي جديد:\n"${message}"\n\nيرجى مراجعة البوابة والرد.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>استفسار توضيحي جديد (RFQ Clarification)</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم إرسال رسالة توضيحية بخصوص طلب عرض الأسعار:</p>
+         <blockquote>"${message}"</blockquote>
+         <p>يرجى تسجيل الدخول للرد على هذا الاستفسار.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = 'New Clarification Message on RFQ';
+    const text = `Hello ${recipientName},\n\nA clarification inquiry was posted regarding your RFQ:\n"${message}"\n\nPlease log in to review and respond.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>New RFQ Clarification Message</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>A new clarification message was posted:</p>
+       <blockquote>"${message}"</blockquote>
+       <p>Please log in to the portal to reply and keep communications aligned.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqQuoted(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const version = (ctx.data?.version as number) || 1;
+    const total = (ctx.data?.total as number) || 0;
+    const currency = (ctx.data?.currency as string) || 'SAR';
+    const validUntil = (ctx.data?.validUntil as string) || '';
+
+    if (lang === 'ar') {
+      const subject = `تم استلام عرض أسعار جديد (الإصدار ${version})`;
+      const text = `مرحباً ${recipientName}،\n\nقام المورّد بتقديم عرض أسعار جديد بقيمة ${total} ${currency}.\nصلاحية العرض حتى: ${validUntil}\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>عرض أسعار جديد (إصدار ${version})</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم استلام عرض أسعار جديد لطلبك بقيمة إجمالية <strong>${total} ${currency}</strong>.</p>
+         <p><strong>صالح حتى:</strong> ${validUntil}</p>
+         <p>يمكنك الآن قبول أو رفض أو طلب توضيحات إضافية عبر المنصة.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `New Quotation Received (Version ${version})`;
+    const text = `Hello ${recipientName},\n\nA quotation has been submitted for your RFQ with a total of ${total} ${currency}.\nValid until: ${validUntil}\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>New Quotation Received (v${version})</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>A formal quotation has been submitted for your project with a total of <strong>${total} ${currency}</strong>.</p>
+       <p><strong>Valid Until:</strong> ${validUntil}</p>
+       <p>Log in to review line item pricing, accept, or decline.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqAccepted(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const total = (ctx.data?.total as number) || 0;
+    const currency = (ctx.data?.currency as string) || 'SAR';
+
+    if (lang === 'ar') {
+      const subject = 'تهانينا! تم قبول عرض الأسعار الخاص بك';
+      const text = `مرحباً ${recipientName}،\n\nيسرنا إبلاغك بأن الراعي قد وافق رسمياً على عرض الأسعار بقيمة ${total} ${currency}.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تهانينا! تم قبول عرض الأسعار</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>يسعدنا إعلامك بأن عرض الأسعار الخاص بك بقيمة <strong>${total} ${currency}</strong> قد تم قبوله رسمياً.</p>
+         <p>يرجى التنسيق مع العميل لبدء مرحلة التنفيذ والخدمات.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = 'Congratulations! Your Quotation Has Been Accepted';
+    const text = `Hello ${recipientName},\n\nYour quotation for ${total} ${currency} has been accepted by the sponsor.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Quotation Accepted!</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Great news! Your quotation of <strong>${total} ${currency}</strong> has been accepted by the client.</p>
+       <p>Please access your dashboard to review delivery schedules and fulfill the project requirements.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqRejected(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const reason = (ctx.data?.reason as string) || 'No specific reason provided';
+
+    if (lang === 'ar') {
+      const subject = 'إشعار بشأن عرض الأسعار أو طلب عرض الأسعار';
+      const text = `مرحباً ${recipientName}،\n\nتم رفض عرض الأسعار أو طلب عرض الأسعار.\nالسبب: ${reason}\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>إشعار عدم القبول</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>نود إبلاغك بأنه لم يتم قبول عرض الأسعار أو طلب عرض الأسعار.</p>
+         <p><strong>السبب المذكور:</strong> ${reason}</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = 'Update on Quotation / RFQ';
+    const text = `Hello ${recipientName},\n\nThe quotation or RFQ has been rejected.\nReason: ${reason}\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Status Update: Declined</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>We are writing to inform you that the quotation or RFQ was declined.</p>
+       <p><strong>Reason provided:</strong> ${reason}</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqCancelled(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const reason = (ctx.data?.reason as string) || 'Cancelled by sponsor';
+
+    if (lang === 'ar') {
+      const subject = 'تم إلغاء طلب عرض الأسعار (RFQ)';
+      const text = `مرحباً ${recipientName}،\n\nتم إلغاء طلب عرض الأسعار من قبل الراعي.\nالسبب: ${reason}\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تم إلغاء طلب عرض الأسعار</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>نود إحاطتك بأنه قد تم إلغاء طلب عرض الأسعار رسمياً.</p>
+         <p><strong>السبب:</strong> ${reason}</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = 'RFQ Cancelled by Sponsor';
+    const text = `Hello ${recipientName},\n\nThe RFQ was cancelled by the sponsor.\nReason: ${reason}\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>RFQ Cancelled</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>The sponsor has cancelled the request for quotation.</p>
+       <p><strong>Reason:</strong> ${reason}</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderRfqExpired(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const title = (ctx.data?.title as string) || ctx.title || '';
+    const titleSnippet = title ? ` — ${title}` : '';
+
+    if (lang === 'ar') {
+      const subject = `انتهت صلاحية طلب عرض الأسعار${titleSnippet}`;
+      const text = `مرحباً ${recipientName}،\n\nنود إعلامك بأن صلاحية طلب عرض الأسعار ${title} قد انتهت.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>انتهاء صلاحية طلب عرض الأسعار</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>نحيطكم علماً بأن طلب عرض الأسعار <strong>"${title || 'RFQ'}"</strong> قد تجاوز التاريخ المحدد وانتهت صلاحيته.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `RFQ Has Expired${titleSnippet}`;
+    const text = `Hello ${recipientName},\n\nThe validity period for RFQ "${title}" has ended and it is now expired.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>RFQ Expired</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>The deadline for request for quotation <strong>"${title || 'RFQ'}"</strong> has passed and it is now expired.</p>`,
+      'en',
+    );
+    return { subject, html, text };
   }
 
   private wrapHtml(content: string, dir: 'en' | 'ar'): string {

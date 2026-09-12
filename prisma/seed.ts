@@ -43,6 +43,9 @@ async function main() {
     { action: 'manage', resource: 'approval', description: 'Approve, reject, suspend business accounts' },
     { action: 'invite', resource: 'organizer', description: 'Invite event organizers' },
     { action: 'manage', resource: 'organizer_invitation', description: 'Manage organizer invitations' },
+    { action: 'manage', resource: 'vendor_service', description: 'Manage vendor services' },
+    { action: 'manage', resource: 'rfq', description: 'Manage RFQs' },
+    { action: 'manage', resource: 'quotation', description: 'Manage Quotations' },
   ];
 
   for (const perm of permissions) {

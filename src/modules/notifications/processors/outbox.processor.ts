@@ -397,6 +397,137 @@ export class OutboxProcessor {
         break;
       }
 
+      case 'RFQ_SENT': {
+        const vendorId = payload.vendorId as string;
+        const title = (payload.title as string) || 'New RFQ';
+        if (vendorId) {
+          await this.orchestrator.orchestrate({
+            userId: vendorId,
+            type: NotificationType.RFQ_SENT,
+            title: 'New RFQ Received',
+            body: `You have received a new request for quotation: "${title}"`,
+            data: payload,
+            idempotencyKey: `rfq-sent:${event.aggregate_id}:${vendorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_VIEWED': {
+        const sponsorId = payload.sponsorId as string;
+        if (sponsorId) {
+          await this.orchestrator.orchestrate({
+            userId: sponsorId,
+            type: NotificationType.RFQ_VIEWED,
+            title: 'RFQ Viewed',
+            body: 'The vendor has opened and viewed your RFQ',
+            data: payload,
+            idempotencyKey: `rfq-viewed:${event.aggregate_id}:${sponsorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_CLARIFICATION_REQUESTED': {
+        const recipientId = payload.recipientId as string;
+        const message = (payload.message as string) || 'New clarification message';
+        if (recipientId) {
+          await this.orchestrator.orchestrate({
+            userId: recipientId,
+            type: NotificationType.RFQ_CLARIFICATION_REQUESTED,
+            title: 'RFQ Clarification Inquiry',
+            body: `New message on RFQ: ${message.slice(0, 100)}`,
+            data: payload,
+            idempotencyKey: `rfq-clarification:${event.id}:${recipientId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_QUOTED': {
+        const sponsorId = payload.sponsorId as string;
+        const version = (payload.version as number) || 1;
+        const total = (payload.total as number) || 0;
+        const currency = (payload.currency as string) || 'SAR';
+        if (sponsorId) {
+          await this.orchestrator.orchestrate({
+            userId: sponsorId,
+            type: NotificationType.RFQ_QUOTED,
+            title: 'New Quotation Received',
+            body: `Quotation v${version} submitted for your RFQ: ${total} ${currency}`,
+            data: payload,
+            idempotencyKey: `rfq-quoted:${event.aggregate_id}:${sponsorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_ACCEPTED': {
+        const vendorId = payload.vendorId as string;
+        const total = (payload.total as number) || 0;
+        const currency = (payload.currency as string) || 'SAR';
+        if (vendorId) {
+          await this.orchestrator.orchestrate({
+            userId: vendorId,
+            type: NotificationType.RFQ_ACCEPTED,
+            title: 'Quotation Accepted!',
+            body: `Your quotation of ${total} ${currency} has been accepted by the sponsor`,
+            data: payload,
+            idempotencyKey: `rfq-accepted:${event.aggregate_id}:${vendorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_REJECTED': {
+        const vendorId = payload.vendorId as string;
+        const sponsorId = payload.sponsorId as string;
+        const targetUserId = vendorId || sponsorId;
+        const reason = (payload.reason as string) || 'No reason provided';
+        if (targetUserId) {
+          await this.orchestrator.orchestrate({
+            userId: targetUserId,
+            type: NotificationType.RFQ_REJECTED,
+            title: 'Quotation / RFQ Rejected',
+            body: `Proposal was not accepted: ${reason}`,
+            data: payload,
+            idempotencyKey: `rfq-rejected:${event.aggregate_id}:${targetUserId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_CANCELLED': {
+        const vendorId = payload.vendorId as string;
+        const reason = (payload.reason as string) || 'Cancelled by sponsor';
+        if (vendorId) {
+          await this.orchestrator.orchestrate({
+            userId: vendorId,
+            type: NotificationType.RFQ_CANCELLED,
+            title: 'RFQ Cancelled',
+            body: `The RFQ was cancelled: ${reason}`,
+            data: payload,
+            idempotencyKey: `rfq-cancelled:${event.aggregate_id}:${vendorId}`,
+          });
+        }
+        break;
+      }
+
+      case 'RFQ_EXPIRED': {
+        const vendorId = payload.vendorId as string;
+        if (vendorId) {
+          await this.orchestrator.orchestrate({
+            userId: vendorId,
+            type: NotificationType.RFQ_EXPIRED,
+            title: 'RFQ Expired',
+            body: 'The RFQ validity window has ended',
+            data: payload,
+            idempotencyKey: `rfq-expired:${event.aggregate_id}:${vendorId}`,
+          });
+        }
+        break;
+      }
+
       default:
         this.logger.debug(`Ignored outbox event type: ${event.event_type}`);
         break;

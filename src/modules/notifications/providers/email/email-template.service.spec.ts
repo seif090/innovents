@@ -68,6 +68,50 @@ describe('EmailTemplateService', () => {
     expect(en.html).toContain('<blockquote>Check out @sarah in this session!</blockquote>');
   });
 
+  it('should render RFQ sent notification in English and Arabic', () => {
+    const en = service.render(NotificationType.RFQ_SENT, {
+      title: 'AV Staging',
+      recipientName: 'Apex Vendor',
+      data: { title: 'AV Staging', expiresAt: '2026-10-01T00:00:00Z' },
+      language: 'en',
+    });
+
+    expect(en.subject).toContain('New Request for Quotation: AV Staging');
+    expect(en.html).toContain('dir="ltr"');
+    expect(en.text).toContain('AV Staging');
+
+    const ar = service.render(NotificationType.RFQ_SENT, {
+      title: 'تجهيزات المسرح',
+      recipientName: 'المورد المعتمد',
+      data: { title: 'تجهيزات المسرح', expiresAt: '2026-10-01' },
+      language: 'ar',
+    });
+
+    expect(ar.subject).toContain('طلب عرض أسعار جديد: تجهيزات المسرح');
+    expect(ar.html).toContain('dir="rtl"');
+    expect(ar.text).toContain('تجهيزات المسرح');
+  });
+
+  it('should render RFQ accepted notification in English and Arabic', () => {
+    const en = service.render(NotificationType.RFQ_ACCEPTED, {
+      recipientName: 'Apex Vendor',
+      data: { total: 15000, currency: 'SAR' },
+      language: 'en',
+    });
+
+    expect(en.subject).toContain('Congratulations! Your Quotation Has Been Accepted');
+    expect(en.html).toContain('15000 SAR');
+
+    const ar = service.render(NotificationType.RFQ_ACCEPTED, {
+      recipientName: 'المورد المعتمد',
+      data: { total: 15000, currency: 'SAR' },
+      language: 'ar',
+    });
+
+    expect(ar.subject).toContain('تهانينا! تم قبول عرض الأسعار الخاص بك');
+    expect(ar.html).toContain('15000 SAR');
+  });
+
   it('should render default notification fallback gracefully', () => {
     const en = service.render(NotificationType.EVENT_PUBLISHED, {
       title: 'New Conference',
