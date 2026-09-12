@@ -48,6 +48,10 @@ export class EmailTemplateService {
         return this.renderAccountRejected(context, lang, recipientName);
       case NotificationType.ACCOUNT_SUSPENDED:
         return this.renderAccountSuspended(context, lang, recipientName);
+      case NotificationType.ORGANIZER_INVITATION_CREATED:
+        return this.renderOrganizerInvitation(context, lang, recipientName);
+      case NotificationType.ORGANIZER_INVITATION_ACCEPTED:
+        return this.renderOrganizerInvitationAccepted(context, lang, recipientName);
       default:
         return this.renderDefaultNotification(context, lang, recipientName);
     }
@@ -372,6 +376,76 @@ export class EmailTemplateService {
       `<h2>Account Suspension Notice</h2>
        <p>Hello <strong>${recipientName}</strong>,</p>
        <p>Your INOVENT account has been suspended due to security or platform policy violations.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderOrganizerInvitation(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const eventName = (ctx.data?.eventName as string) || ctx.title || 'INOVENT Event';
+    const inviterName = (ctx.data?.inviterName as string) || 'Event Owner';
+    const invitationLink = (ctx.data?.invitationLink as string) || '#';
+    const expiresAt = (ctx.data?.expiresAt as string) || '';
+
+    if (lang === 'ar') {
+      const subject = `دعوة للانضمام كمنظم للفعالية — ${eventName}`;
+      const text = `مرحباً ${recipientName}،\n\nتمت دعوتك من قِبل ${inviterName} للانضمام كمنظم للفعالية "${eventName}".\n\nرابط قبول الدعوة: ${invitationLink}\nتنتهي صلاحية هذه الدعوة في: ${expiresAt}\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>دعوة لتنظيم الفعالية</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>يسرنا إبلاغك بأن <strong>${inviterName}</strong> قد دعاك للانضمام إلى فريق تنظيم الفعالية <strong>"${eventName}"</strong>.</p>
+         <p><strong>تاريخ انتهاء الدعوة:</strong> ${expiresAt}</p>
+         <p><a href="${invitationLink}" style="display:inline-block;padding:10px 20px;background:#0052cc;color:#ffffff;text-decoration:none;border-radius:4px;">قبول الدعوة</a></p>
+         <p style="font-size:12px;color:#6b778c;">إذا لم تكن تتوقع هذه الدعوة، يمكنك تجاهل هذا البريد بأمان.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Invitation to organize event: ${eventName}`;
+    const text = `Hello ${recipientName},\n\nYou have been invited by ${inviterName} to join the organizing team for "${eventName}".\n\nAccept invitation: ${invitationLink}\nThis invitation expires at: ${expiresAt}\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Event Organizer Invitation</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>You have been invited by <strong>${inviterName}</strong> to join the organizing team for <strong>"${eventName}"</strong>.</p>
+       <p><strong>Expires:</strong> ${expiresAt}</p>
+       <p><a href="${invitationLink}" style="display:inline-block;padding:10px 20px;background:#0052cc;color:#ffffff;text-decoration:none;border-radius:4px;">Accept Invitation</a></p>
+       <p style="font-size:12px;color:#6b778c;">If you were not expecting this invitation, you can safely ignore this email.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderOrganizerInvitationAccepted(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const eventName = (ctx.data?.eventName as string) || ctx.title || 'INOVENT Event';
+    const organizerEmail = (ctx.data?.organizerEmail as string) || '';
+
+    if (lang === 'ar') {
+      const subject = `تم قبول دعوة التنظيم للفعالية — ${eventName}`;
+      const text = `مرحباً ${recipientName}،\n\nقام ${organizerEmail} بقبول دعوتك للانضمام كمنظم للفعالية "${eventName}".`;
+      const html = this.wrapHtml(
+        `<h2>تم قبول دعوة التنظيم</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>قام <strong>${organizerEmail}</strong> بقبول دعوتك للانضمام إلى فريق تنظيم الفعالية <strong>"${eventName}"</strong> بنجاح.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Organizer invitation accepted for ${eventName}`;
+    const text = `Hello ${recipientName},\n\n${organizerEmail} has accepted your invitation to join the organizing team for "${eventName}".`;
+    const html = this.wrapHtml(
+      `<h2>Organizer Invitation Accepted</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p><strong>${organizerEmail}</strong> has accepted your invitation to join the organizing team for <strong>"${eventName}"</strong>.</p>`,
       'en',
     );
     return { subject, html, text };

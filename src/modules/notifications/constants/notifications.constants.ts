@@ -23,6 +23,8 @@ export const NOTIFICATION_SECURITY_TYPES: ReadonlySet<NotificationType> = new Se
     NotificationType.ACCOUNT_SUSPENDED,
     NotificationType.ACCOUNT_REJECTED,
     NotificationType.ACCOUNT_APPROVED,
+    NotificationType.ORGANIZER_INVITATION_CREATED,
+    NotificationType.ORGANIZER_INVITATION_ACCEPTED,
   ],
 );
 
@@ -51,6 +53,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<NotificationType, DefaultP
   [NotificationType.ACCOUNT_APPROVED]: { inApp: true, push: true, email: true },
   [NotificationType.ACCOUNT_REJECTED]: { inApp: true, push: true, email: true },
   [NotificationType.ACCOUNT_SUSPENDED]: { inApp: true, push: true, email: true },
+  [NotificationType.ORGANIZER_INVITATION_CREATED]: { inApp: true, push: true, email: true },
+  [NotificationType.ORGANIZER_INVITATION_ACCEPTED]: { inApp: true, push: true, email: true },
 };
 
 export const NOTIFICATION_OUTBOX_EVENTS = {

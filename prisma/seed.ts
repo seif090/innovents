@@ -37,6 +37,12 @@ async function main() {
     { action: 'join', resource: 'community', description: 'Join communities' },
     { action: 'create', resource: 'rfq', description: 'Submit B2B RFQs' },
     { action: 'quote', resource: 'rfq', description: 'Submit quotation for RFQ' },
+    { action: 'read', resource: 'profile', description: 'Read user profile' },
+    { action: 'update', resource: 'profile', description: 'Update user profile' },
+    { action: 'read', resource: 'approval', description: 'View business account approvals' },
+    { action: 'manage', resource: 'approval', description: 'Approve, reject, suspend business accounts' },
+    { action: 'invite', resource: 'organizer', description: 'Invite event organizers' },
+    { action: 'manage', resource: 'organizer_invitation', description: 'Manage organizer invitations' },
   ];
 
   for (const perm of permissions) {

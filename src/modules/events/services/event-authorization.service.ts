@@ -107,4 +107,28 @@ export class EventAuthorizationService {
 
     throw new NotFoundException('Event not found');
   }
+
+  /**
+   * Asserts that a user is authorized to create or revoke organizer invitations for an event.
+   * Only ADMIN or the specific EVENT_OWNER is permitted. Assigned ORGANIZERs cannot invite other organizers.
+   */
+  async assertCanInviteOrganizer(
+    userId: string,
+    userRoles: string[],
+    eventId: string,
+  ): Promise<Event> {
+    const event = await this.prisma.event.findFirst({
+      where: { id: eventId, deletedAt: null },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (userRoles.includes('ADMIN') || event.ownerId === userId) {
+      return event;
+    }
+
+    throw new ForbiddenException('Only the event owner or an administrator can invite organizers');
+  }
 }

@@ -18,6 +18,9 @@ import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
 import { CommunitiesModule } from './modules/communities/communities.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { BusinessProfilesModule } from './modules/business-profiles/business-profiles.module';
+import { AdminApprovalsModule } from './modules/admin-approvals/admin-approvals.module';
+import { OrganizerInvitationsModule } from './modules/organizer-invitations/organizer-invitations.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -56,6 +59,9 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     EventsModule,
     CommunitiesModule,
     NotificationsModule,
+    BusinessProfilesModule,
+    AdminApprovalsModule,
+    OrganizerInvitationsModule,
     AuditModule,
     OutboxModule,
     HealthModule,

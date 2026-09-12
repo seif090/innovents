@@ -1,10 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { OutboxStatus, NotificationType } from '@prisma/client';
 import { NotificationOrchestratorService } from '../services/notification-orchestrator.service';
 import { NotificationFanoutService } from '../services/notification-fanout.service';
 import { NOTIFICATION_LIMITS } from '../constants/notifications.constants';
+import { QueueService } from '../../../infrastructure/queue/queue.service';
+import { QUEUE_NAMES } from '../../../infrastructure/queue/queue.constants';
+import { EmailTemplateService } from '../providers/email/email-template.service';
 
 interface RawOutboxRecord {
   id: string;
@@ -26,6 +29,8 @@ export class OutboxProcessor {
     private readonly orchestrator: NotificationOrchestratorService,
     private readonly fanout: NotificationFanoutService,
     private readonly configService: ConfigService,
+    @Optional() private readonly queueService?: QueueService,
+    @Optional() private readonly emailTemplateService?: EmailTemplateService,
   ) {
     this.batchSize = this.configService.get<number>('notifications.outboxBatchSize', 50);
     this.maxAttempts = this.configService.get<number>(
@@ -297,17 +302,96 @@ export class OutboxProcessor {
         break;
       }
 
+      case 'ACCOUNT_APPROVED': {
+        const userId = (payload.userId as string) || event.aggregate_id;
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.ACCOUNT_APPROVED,
+            title: 'Account Approved',
+            body: 'Your business account application has been reviewed and approved',
+            data: payload,
+            idempotencyKey: `account-approved:${userId}:${event.id}`,
+          });
+        }
+        break;
+      }
+
+      case 'ACCOUNT_REJECTED': {
+        const userId = (payload.userId as string) || event.aggregate_id;
+        const reason = (payload.reason as string) || 'Application requirements not met';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.ACCOUNT_REJECTED,
+            title: 'Account Application Rejected',
+            body: `Your business account application was not approved: ${reason}`,
+            data: payload,
+            idempotencyKey: `account-rejected:${userId}:${event.id}`,
+          });
+        }
+        break;
+      }
+
+      case 'ACCOUNT_SUSPENDED':
       case 'ACCOUNT_LOCKED':
       case 'USER_SUSPENDED': {
         const userId = (payload.userId as string) || event.aggregate_id;
+        const reason = (payload.reason as string) || 'Security or platform policy violations';
         if (userId) {
           await this.orchestrator.orchestrate({
             userId,
             type: NotificationType.ACCOUNT_SUSPENDED,
             title: 'Account Suspended',
-            body: 'Your account has been suspended due to security or policy compliance',
+            body: `Your account has been suspended: ${reason}`,
             data: payload,
             idempotencyKey: `security:account-suspended:${userId}:${event.id}`,
+          });
+        }
+        break;
+      }
+
+      case 'ORGANIZER_INVITATION_CREATED': {
+        const email = payload.email as string;
+        const eventName = (payload.eventName as string) || 'Event';
+        const inviterName = (payload.inviterName as string) || 'Event Owner';
+        const invitationLink = (payload.invitationLink as string) || '';
+        const expiresAt = (payload.expiresAt as string) || '';
+
+        if (this.queueService && email) {
+          const rendered = this.emailTemplateService
+            ? this.emailTemplateService.render(NotificationType.ORGANIZER_INVITATION_CREATED, {
+                recipientName: email,
+                title: `Invitation to organize event: ${eventName}`,
+                data: { eventName, inviterName, invitationLink, expiresAt },
+              })
+            : {
+                subject: `Invitation to organize event: ${eventName}`,
+                html: `<p>You have been invited to organize ${eventName}. <a href="${invitationLink}">Accept Invitation</a></p>`,
+                text: `You have been invited to organize ${eventName}: ${invitationLink}`,
+              };
+
+          await this.queueService.addJob(QUEUE_NAMES.EMAIL, 'send-organizer-invitation', {
+            to: email,
+            subject: rendered.subject,
+            html: rendered.html,
+          });
+        }
+        break;
+      }
+
+      case 'ORGANIZER_INVITATION_ACCEPTED': {
+        const eventOwnerId = payload.eventOwnerId as string;
+        const eventName = (payload.eventName as string) || 'Event';
+        const organizerEmail = (payload.organizerEmail as string) || 'An organizer';
+        if (eventOwnerId) {
+          await this.orchestrator.orchestrate({
+            userId: eventOwnerId,
+            type: NotificationType.ORGANIZER_INVITATION_ACCEPTED,
+            title: 'Organizer Invitation Accepted',
+            body: `${organizerEmail} accepted your invitation to organize "${eventName}"`,
+            data: payload,
+            idempotencyKey: `organizer-invitation-accepted:${event.aggregate_id}:${eventOwnerId}`,
           });
         }
         break;
