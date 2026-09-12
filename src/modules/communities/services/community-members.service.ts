@@ -22,6 +22,7 @@ import {
   CommunityMemberRole,
   CommunityMemberStatus,
   CommunityStatus,
+  CommunitySponsorshipStatus,
   CommunityVisibility,
   Prisma,
 } from '@prisma/client';
@@ -104,8 +105,21 @@ export class CommunityMembersService {
         }
       }
 
-      // Enforce capacity constraint
-      if (lockedComm.member_count >= lockedComm.member_capacity) {
+      // Enforce capacity constraint with dynamic query-level sponsorship validity
+      const now = new Date();
+      const activeSponsorship = tx.communitySponsorship
+        ? await tx.communitySponsorship.findFirst({
+            where: {
+              communityId,
+              status: CommunitySponsorshipStatus.ACTIVE,
+              endsAt: { gt: now },
+            },
+          })
+        : null;
+
+      const effectiveCapacity = activeSponsorship ? activeSponsorship.sponsoredCapacity : 20;
+
+      if (lockedComm.member_count >= effectiveCapacity) {
         throw new ConflictException('Community has reached its maximum member capacity');
       }
 

@@ -17,6 +17,7 @@ import {
   CommunityMemberRole,
   CommunityMemberStatus,
   CommunityStatus,
+  CommunitySponsorshipStatus,
   CommunityType,
   CommunityVisibility,
   Prisma,
@@ -490,6 +491,53 @@ export class CommunitiesService {
       creator,
       currentUserRole,
       isMember,
+    };
+  }
+
+  /**
+   * Get active sponsorship details for a community
+   */
+  async getSponsorship(communityId: string) {
+    const community = await this.prisma.community.findFirst({
+      where: { id: communityId, deletedAt: null },
+    });
+
+    if (!community) {
+      throw new NotFoundException('Community not found');
+    }
+
+    const activeSponsorship = await this.prisma.communitySponsorship.findFirst({
+      where: {
+        communityId,
+        status: CommunitySponsorshipStatus.ACTIVE,
+        endsAt: { gt: new Date() },
+      },
+      include: {
+        sponsor: {
+          select: {
+            id: true,
+            companyName: true,
+            logoUrl: true,
+            website: true,
+          },
+        },
+      },
+      orderBy: { endsAt: 'desc' },
+    });
+
+    if (!activeSponsorship) {
+      return {
+        isSponsored: false,
+        memberCapacity: 20,
+      };
+    }
+
+    return {
+      isSponsored: true,
+      memberCapacity: activeSponsorship.sponsoredCapacity,
+      startsAt: activeSponsorship.startsAt,
+      endsAt: activeSponsorship.endsAt,
+      sponsor: activeSponsorship.sponsor,
     };
   }
 }

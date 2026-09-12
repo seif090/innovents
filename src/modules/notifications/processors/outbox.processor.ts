@@ -626,6 +626,135 @@ export class OutboxProcessor {
         break;
       }
 
+      case 'COMMUNITY_SPONSORSHIP_PAID': {
+        const userId = payload.userId as string;
+        const communityName = (payload.communityName as string) || 'Community';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.COMMUNITY_SPONSORSHIP_PAID,
+            title: 'Sponsorship Payment Received',
+            body: `Payment received for sponsoring "${communityName}"`,
+            data: payload,
+            idempotencyKey: `sponsorship-paid:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'COMMUNITY_SPONSORSHIP_ACTIVATED': {
+        const userId = payload.userId as string;
+        const communityName = (payload.communityName as string) || 'Community';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.COMMUNITY_SPONSORSHIP_ACTIVATED,
+            title: 'Community Sponsorship Activated',
+            body: `Community "${communityName}" is now active and sponsored`,
+            data: payload,
+            idempotencyKey: `sponsorship-activated:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'COMMUNITY_SPONSORSHIP_EXPIRED': {
+        const userId = payload.userId as string;
+        const communityName = (payload.communityName as string) || 'Community';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.COMMUNITY_SPONSORSHIP_EXPIRED,
+            title: 'Community Sponsorship Expired',
+            body: `The sponsorship period for "${communityName}" has expired`,
+            data: payload,
+            idempotencyKey: `sponsorship-expired:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SUBSCRIPTION_ACTIVATED': {
+        const userId = payload.userId as string;
+        const planName = (payload.planName as string) || 'Subscription';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.SUBSCRIPTION_ACTIVATED,
+            title: 'Subscription Activated',
+            body: `Your "${planName}" subscription is now active`,
+            data: payload,
+            idempotencyKey: `sub-activated:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SUBSCRIPTION_RENEWED': {
+        const userId = payload.userId as string;
+        const planName = (payload.planName as string) || 'Subscription';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.SUBSCRIPTION_RENEWED,
+            title: 'Subscription Renewed',
+            body: `Your "${planName}" subscription has renewed successfully`,
+            data: payload,
+            idempotencyKey: `sub-renewed:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SUBSCRIPTION_PAYMENT_FAILED': {
+        const userId = payload.userId as string;
+        const planName = (payload.planName as string) || 'Subscription';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.SUBSCRIPTION_PAYMENT_FAILED,
+            title: 'Subscription Payment Failed',
+            body: `Renewal payment failed for "${planName}". Please update your billing method`,
+            data: payload,
+            idempotencyKey: `sub-failed:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'SUBSCRIPTION_CANCELLED': {
+        const userId = payload.userId as string;
+        const planName = (payload.planName as string) || 'Subscription';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.SUBSCRIPTION_CANCELLED,
+            title: 'Subscription Cancelled',
+            body: `Your subscription "${planName}" has been cancelled`,
+            data: payload,
+            idempotencyKey: `sub-cancelled:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
+      case 'PAYMENT_REFUNDED': {
+        const userId = payload.userId as string;
+        const amount = payload.amount ? String(payload.amount) : '0';
+        const currency = (payload.currency as string) || 'SAR';
+        if (userId) {
+          await this.orchestrator.orchestrate({
+            userId,
+            type: NotificationType.PAYMENT_REFUNDED,
+            title: 'Payment Refunded',
+            body: `A refund of ${amount} ${currency} has been processed`,
+            data: payload,
+            idempotencyKey: `payment-refunded:${event.aggregate_id}:${userId}`,
+          });
+        }
+        break;
+      }
+
       default:
         this.logger.debug(`Ignored outbox event type: ${event.event_type}`);
         break;

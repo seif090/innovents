@@ -1,36 +1,18 @@
 import { Global, Module } from '@nestjs/common';
-import { PAYMENT_PROVIDER, PaymentProvider } from './payment.interface';
-
-// Sprint 1 Mock/Stub implementation for PaymentProvider
-class MockPaymentProvider implements PaymentProvider {
-  async createCheckoutSession(): Promise<{ sessionId: string; checkoutUrl: string }> {
-    return {
-      sessionId: 'mock_session_id',
-      checkoutUrl: 'https://checkout.stripe.com/mock',
-    };
-  }
-
-  async verifyWebhookSignature(): Promise<{
-    id: string;
-    type: string;
-    data: Record<string, unknown>;
-  }> {
-    return {
-      id: 'mock_evt_1',
-      type: 'payment_intent.succeeded',
-      data: {},
-    };
-  }
-}
+import { ConfigModule } from '@nestjs/config';
+import { PAYMENT_PROVIDER } from './payment.interface';
+import { StripePaymentProvider } from './stripe-payment.provider';
 
 @Global()
 @Module({
+  imports: [ConfigModule],
   providers: [
+    StripePaymentProvider,
     {
       provide: PAYMENT_PROVIDER,
-      useClass: MockPaymentProvider,
+      useExisting: StripePaymentProvider,
     },
   ],
-  exports: [PAYMENT_PROVIDER],
+  exports: [PAYMENT_PROVIDER, StripePaymentProvider],
 })
-export class PaymentsModule {}
+export class PaymentsInfrastructureModule {}

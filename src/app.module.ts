@@ -8,8 +8,10 @@ import { CacheModule } from './infrastructure/cache/cache.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { EmailModule } from './infrastructure/email/email.module';
-import { PaymentsModule } from './infrastructure/payments/payments.module';
+import { PaymentsInfrastructureModule } from './infrastructure/payments/payments.module';
 import { RealtimeModule } from './infrastructure/realtime/realtime.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { HealthModule } from './modules/health/health.module';
@@ -53,7 +55,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     QueueModule,
     StorageModule,
     EmailModule,
-    PaymentsModule,
+    PaymentsInfrastructureModule,
     RealtimeModule,
 
     // Domain & System Modules
@@ -68,6 +70,8 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     B2bMarketplaceModule,
     C2bMarketplaceModule,
     SponsorAdsModule,
+    PaymentsModule,
+    SubscriptionsModule,
     AuditModule,
     OutboxModule,
     HealthModule,

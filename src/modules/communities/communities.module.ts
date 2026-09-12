@@ -1,3 +1,4 @@
+import { CommunitySponsorshipExpirationService } from './services/community-sponsorship-expiration.service';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
@@ -40,6 +41,8 @@ import { CommunityGateway } from './gateways/community.gateway';
     CommunityRepliesService,
     CommunityLikesService,
     CommunityMeetupsService,
+    CommunitySponsorshipExpirationService,
+    CommunitySponsorshipExpirationService,
     CommunityChatService,
     CommunityGateway,
   ],

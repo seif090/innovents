@@ -143,4 +143,12 @@ export class CommunitiesController {
       req.headers['user-agent'],
     );
   }
+
+  @Get(':id/sponsorship')
+  @Public()
+  @ApiOperation({ summary: 'Get active community sponsorship details' })
+  @ApiResponse({ status: 200, description: 'Community sponsorship details' })
+  async getSponsorship(@Param('id', ParseUUIDPipe) id: string) {
+    return this.communitiesService.getSponsorship(id);
+  }
 }

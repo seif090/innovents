@@ -34,6 +34,15 @@ export const NOTIFICATION_SECURITY_TYPES: ReadonlySet<NotificationType> = new Se
     NotificationType.C2B_BOOKING_STATUS_CHANGED,
     NotificationType.SPONSOR_AD_APPROVED,
     NotificationType.SPONSOR_AD_REJECTED,
+    // Sprint 9 Financial & Subscription Notifications
+    NotificationType.COMMUNITY_SPONSORSHIP_PAID,
+    NotificationType.COMMUNITY_SPONSORSHIP_ACTIVATED,
+    NotificationType.COMMUNITY_SPONSORSHIP_EXPIRED,
+    NotificationType.SUBSCRIPTION_ACTIVATED,
+    NotificationType.SUBSCRIPTION_RENEWED,
+    NotificationType.SUBSCRIPTION_PAYMENT_FAILED,
+    NotificationType.SUBSCRIPTION_CANCELLED,
+    NotificationType.PAYMENT_REFUNDED,
   ],
 );
 
@@ -78,6 +87,14 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<NotificationType, DefaultP
   [NotificationType.SPONSOR_AD_APPROVED]: { inApp: true, push: true, email: true },
   [NotificationType.SPONSOR_AD_REJECTED]: { inApp: true, push: true, email: true },
   [NotificationType.COUPON_REDEEMED]: { inApp: true, push: false, email: true },
+  [NotificationType.COMMUNITY_SPONSORSHIP_PAID]: { inApp: true, push: true, email: true },
+  [NotificationType.COMMUNITY_SPONSORSHIP_ACTIVATED]: { inApp: true, push: true, email: true },
+  [NotificationType.COMMUNITY_SPONSORSHIP_EXPIRED]: { inApp: true, push: true, email: true },
+  [NotificationType.SUBSCRIPTION_ACTIVATED]: { inApp: true, push: true, email: true },
+  [NotificationType.SUBSCRIPTION_RENEWED]: { inApp: true, push: true, email: true },
+  [NotificationType.SUBSCRIPTION_PAYMENT_FAILED]: { inApp: true, push: true, email: true },
+  [NotificationType.SUBSCRIPTION_CANCELLED]: { inApp: true, push: true, email: true },
+  [NotificationType.PAYMENT_REFUNDED]: { inApp: true, push: true, email: true },
 };
 
 export const NOTIFICATION_OUTBOX_EVENTS = {

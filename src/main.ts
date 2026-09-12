@@ -11,6 +11,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
+    rawBody: true,
     bufferLogs: true,
   });
 
@@ -41,8 +42,15 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'x-correlation-id'],
   });
 
-  // 3. Payload size limits
-  app.use(express.json({ limit: '10mb' }));
+  // 3. Payload size limits with raw body preservation for Stripe webhook signature verification
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   // 4. Global Filters, Interceptors & Validation

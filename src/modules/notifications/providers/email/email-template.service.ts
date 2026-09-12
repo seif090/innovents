@@ -78,6 +78,22 @@ export class EmailTemplateService {
         return this.renderSponsorAdRejected(context, lang, recipientName);
       case NotificationType.COUPON_REDEEMED:
         return this.renderCouponRedeemed(context, lang, recipientName);
+      case NotificationType.COMMUNITY_SPONSORSHIP_PAID:
+        return this.renderCommunitySponsorshipPaid(context, lang, recipientName);
+      case NotificationType.COMMUNITY_SPONSORSHIP_ACTIVATED:
+        return this.renderCommunitySponsorshipActivated(context, lang, recipientName);
+      case NotificationType.COMMUNITY_SPONSORSHIP_EXPIRED:
+        return this.renderCommunitySponsorshipExpired(context, lang, recipientName);
+      case NotificationType.SUBSCRIPTION_ACTIVATED:
+        return this.renderSubscriptionActivated(context, lang, recipientName);
+      case NotificationType.SUBSCRIPTION_RENEWED:
+        return this.renderSubscriptionRenewed(context, lang, recipientName);
+      case NotificationType.SUBSCRIPTION_PAYMENT_FAILED:
+        return this.renderSubscriptionPaymentFailed(context, lang, recipientName);
+      case NotificationType.SUBSCRIPTION_CANCELLED:
+        return this.renderSubscriptionCancelled(context, lang, recipientName);
+      case NotificationType.PAYMENT_REFUNDED:
+        return this.renderPaymentRefunded(context, lang, recipientName);
       default:
         return this.renderDefaultNotification(context, lang, recipientName);
     }
@@ -929,6 +945,260 @@ export class EmailTemplateService {
       `<h2>Coupon Redeemed</h2>
        <p>Hello <strong>${recipientName}</strong>,</p>
        <p>Your promotional coupon <strong>"${code}"</strong> has been redeemed by <strong>${attendeeName}</strong>.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderCommunitySponsorshipPaid(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const communityName = (ctx.data?.communityName as string) || 'Community';
+    const amount = ctx.data?.amount ? String(ctx.data.amount) : '500';
+    const currency = (ctx.data?.currency as string) || 'SAR';
+
+    if (lang === 'ar') {
+      const subject = `تم استلام دفعة رعاية المجتمع: ${communityName}`;
+      const text = `مرحباً ${recipientName}،\n\nتم استلام دفعتك بمبلغ ${amount} ${currency} لرعاية مجتمع "${communityName}".\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تأكيد دفع الرعاية</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم استلام دفعتك بنجاح بمبلغ <strong>${amount} ${currency}</strong> لرعاية مجتمع <strong>"${communityName}"</strong>.</p>
+         <p>سيتم تفعيل مميزات الرعاية فوراً.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Payment Received for Community Sponsorship: ${communityName}`;
+    const text = `Hello ${recipientName},\n\nYour payment of ${amount} ${currency} for sponsoring "${communityName}" has been received.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Sponsorship Payment Confirmed</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>We have successfully received your payment of <strong>${amount} ${currency}</strong> for sponsoring the community <strong>"${communityName}"</strong>.</p>
+       <p>Your sponsorship benefits are now active.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderCommunitySponsorshipActivated(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const communityName = (ctx.data?.communityName as string) || 'Community';
+    const capacity = ctx.data?.memberCapacity ? String(ctx.data.memberCapacity) : '500';
+
+    if (lang === 'ar') {
+      const subject = `تم تفعيل رعاية المجتمع: ${communityName}`;
+      const text = `مرحباً ${recipientName}،\n\nأصبح مجتمع "${communityName}" ممولاً رسمياً مع زيادة السعة إلى ${capacity} عضواً.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تم تفعيل رعاية المجتمع</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>أصبح مجتمع <strong>"${communityName}"</strong> برعايتك الرسمية الآن.</p>
+         <p><strong>المزايا المفعلة:</strong> شارة الراعي، تثبيت المجتمع في الأعلى، وسعة تصل إلى ${capacity} عضواً.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Community Sponsorship Activated: ${communityName}`;
+    const text = `Hello ${recipientName},\n\nCommunity "${communityName}" is now officially sponsored with expanded capacity to ${capacity} members.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Community Sponsorship Active</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>The community <strong>"${communityName}"</strong> is now actively sponsored.</p>
+       <p><strong>Active Benefits:</strong> Sponsored badge, top-pinned placement, and expanded capacity to ${capacity} members.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderCommunitySponsorshipExpired(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const communityName = (ctx.data?.communityName as string) || 'Community';
+
+    if (lang === 'ar') {
+      const subject = `انتهاء رعاية المجتمع: ${communityName}`;
+      const text = `مرحباً ${recipientName}،\n\nانتهت فترة رعاية مجتمع "${communityName}". تمت إعادة السعة إلى الحد القياسي (20 عضواً).\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>انتهاء فترة رعاية المجتمع</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>انتهت فترة رعاية مجتمع <strong>"${communityName}"</strong>.</p>
+         <p>تمت إعادة سعة الانضمام الجديدة إلى الوضع الافتراضي، مع الحفاظ الكامل على الأعضاء الحاليين.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Community Sponsorship Expired: ${communityName}`;
+    const text = `Hello ${recipientName},\n\nThe sponsorship for "${communityName}" has expired. Member capacity reverted to default (20 members).\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Community Sponsorship Expired</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>The sponsorship duration for <strong>"${communityName}"</strong> has expired.</p>
+       <p>Member capacity for new joins has reverted to standard limit. Existing members remain unaffected.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSubscriptionActivated(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const planName = (ctx.data?.planName as string) || 'Subscription';
+
+    if (lang === 'ar') {
+      const subject = `تم تفعيل اشتراكك: ${planName}`;
+      const text = `مرحباً ${recipientName}،\n\nتم تفعيل اشتراكك في باقة "${planName}" بنجاح.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تم تفعيل الاشتراك بنجاح</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>أصبح اشتراكك في باقة <strong>"${planName}"</strong> مفعلاً ومتاحاً للاستخدام الآن.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Subscription Activated: ${planName}`;
+    const text = `Hello ${recipientName},\n\nYour subscription to "${planName}" has been successfully activated.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Subscription Active</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your subscription to <strong>"${planName}"</strong> is now active and ready to use.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSubscriptionRenewed(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const planName = (ctx.data?.planName as string) || 'Subscription';
+
+    if (lang === 'ar') {
+      const subject = `تم تجديد اشتراكك بنجاح: ${planName}`;
+      const text = `مرحباً ${recipientName}،\n\nتم تجديد اشتراكك في باقة "${planName}" بنجاح.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تم تجديد الاشتراك</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم تجديد اشتراكك في باقة <strong>"${planName}"</strong> بنجاح للفترة القادمة.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Subscription Renewed: ${planName}`;
+    const text = `Hello ${recipientName},\n\nYour subscription to "${planName}" has renewed successfully.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Subscription Renewed</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your subscription to <strong>"${planName}"</strong> has been successfully renewed.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSubscriptionPaymentFailed(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const planName = (ctx.data?.planName as string) || 'Subscription';
+
+    if (lang === 'ar') {
+      const subject = `فشل دفع تجديد الاشتراك: ${planName}`;
+      const text = `مرحباً ${recipientName}،\n\nتعذر تجديد اشتراكك في باقة "${planName}". يرجى تحديث وسيلة الدفع لتجنب إيقاف الخدمة.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تعذر تجديد الاشتراك</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تعذر خصم قيمة تجديد اشتراكك في باقة <strong>"${planName}"</strong>.</p>
+         <p>يرجى تحديث بيانات وسيلة الدفع الخاصة بك عبر لوحة التحكم لتجنب انقطاع المزايا.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Payment Failed: Subscription ${planName}`;
+    const text = `Hello ${recipientName},\n\nWe could not process your renewal payment for "${planName}". Please update your payment method.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Payment Failed for Subscription Renewal</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>We were unable to process your renewal payment for <strong>"${planName}"</strong>.</p>
+       <p>Please update your billing information to keep your subscription active.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderSubscriptionCancelled(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const planName = (ctx.data?.planName as string) || 'Subscription';
+
+    if (lang === 'ar') {
+      const subject = `تم إلغاء الاشتراك: ${planName}`;
+      const text = `مرحباً ${recipientName}،\n\nتم إلغاء اشتراكك في باقة "${planName}". ستبقى المزايا مفعلة حتى نهاية الفترة الحالية.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تم إلغاء الاشتراك</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم استلام طلب إلغاء اشتراكك في باقة <strong>"${planName}"</strong>.</p>
+         <p>ستظل مزاياك الحالية متاحة حتى نهاية دورة الفوترة المدفوعة.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Subscription Cancelled: ${planName}`;
+    const text = `Hello ${recipientName},\n\nYour subscription to "${planName}" has been cancelled. Active benefits will remain until the end of the billing period.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Subscription Cancelled</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>Your subscription to <strong>"${planName}"</strong> has been cancelled.</p>
+       <p>You will retain access to your plan features until the end of your current billing period.</p>`,
+      'en',
+    );
+    return { subject, html, text };
+  }
+
+  private renderPaymentRefunded(
+    ctx: EmailTemplateContext,
+    lang: 'en' | 'ar',
+    recipientName: string,
+  ): RenderedEmail {
+    const amount = ctx.data?.amount ? String(ctx.data.amount) : '0';
+    const currency = (ctx.data?.currency as string) || 'SAR';
+
+    if (lang === 'ar') {
+      const subject = `تم استرداد مبلغ الدفع: ${amount} ${currency}`;
+      const text = `مرحباً ${recipientName}،\n\nتمت معالجة استرداد مبلغ ${amount} ${currency} بنجاح إلى حسابك.\n\nفريق إينوفنت`;
+      const html = this.wrapHtml(
+        `<h2>تأكيد استرداد المبلغ</h2>
+         <p>مرحباً <strong>${recipientName}</strong>،</p>
+         <p>تم استرداد مبلغ <strong>${amount} ${currency}</strong> بنجاح إلى وسيلة الدفع الأصلية الخاصة بك.</p>`,
+        'ar',
+      );
+      return { subject, html, text };
+    }
+
+    const subject = `Payment Refunded: ${amount} ${currency}`;
+    const text = `Hello ${recipientName},\n\nA refund of ${amount} ${currency} has been processed back to your original payment method.\n\nBest regards,\nThe INOVENT Team`;
+    const html = this.wrapHtml(
+      `<h2>Refund Processed</h2>
+       <p>Hello <strong>${recipientName}</strong>,</p>
+       <p>A refund of <strong>${amount} ${currency}</strong> has been issued to your original payment method.</p>`,
       'en',
     );
     return { subject, html, text };

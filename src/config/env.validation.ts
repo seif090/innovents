@@ -127,6 +127,10 @@ export class EnvironmentVariables {
   @IsOptional()
   STRIPE_WEBHOOK_SECRET?: string;
 
+  @IsString()
+  @IsOptional()
+  STRIPE_PUBLISHABLE_KEY?: string;
+
   // OAuth
   @IsString()
   @IsOptional()
