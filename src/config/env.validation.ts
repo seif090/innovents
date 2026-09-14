@@ -141,6 +141,22 @@ export class EnvironmentVariables {
   GOOGLE_CLIENT_SECRET?: string;
 
   @IsString()
+@IsOptional()
+GOOGLE_CALLBACK_URL?: string;
+
+@IsString()
+@IsOptional()
+OAUTH_FRONTEND_REDIRECT_URL?: string;
+
+@IsNumber()
+@IsOptional()
+OAUTH_STATE_TTL_SECONDS: number = 600;
+
+@IsNumber()
+@IsOptional()
+OAUTH_EXCHANGE_TTL_SECONDS: number = 60;
+
+  @IsString()
   @IsOptional()
   LINKEDIN_CLIENT_ID?: string;
 

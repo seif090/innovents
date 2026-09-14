@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, Length, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length, Matches, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { Match } from '@common/decorators/match.decorator';
 
 export class RequestPasswordResetDto {
   @ApiProperty({
@@ -30,8 +31,12 @@ export class ConfirmPasswordResetDto {
     example: '123456',
   })
   @IsString()
-  @Length(6, 6, { message: 'Code must be exactly 6 digits' })
-  @Matches(/^\d{6}$/, { message: 'Code must contain only digits' })
+  @Length(6, 6, {
+    message: 'Code must be exactly 6 digits',
+  })
+  @Matches(/^\d{6}$/, {
+    message: 'Code must contain only digits',
+  })
   code!: string;
 
   @ApiProperty({
@@ -39,9 +44,24 @@ export class ConfirmPasswordResetDto {
     example: 'NewSecurePass2026!',
   })
   @IsString()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @MinLength(8, {
+    message: 'Password must be at least 8 characters long',
+  })
   @Matches(/^(?=.*[A-Za-z])(?=.*\d)/, {
     message: 'Password must contain at least one letter and one number',
   })
   newPassword!: string;
+
+  @ApiProperty({
+    description: 'Confirmation of the new password',
+    example: 'NewSecurePass2026!',
+  })
+  @IsString()
+  @IsNotEmpty({
+    message: 'Password confirmation is required',
+  })
+  @Match('newPassword', {
+    message: 'Passwords do not match',
+  })
+  confirmNewPassword!: string;
 }

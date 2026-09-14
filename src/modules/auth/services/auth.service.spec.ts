@@ -9,7 +9,6 @@ import { AuditService } from '../../audit/audit.service';
 import { OutboxService } from '../../outbox/outbox.service';
 import { QueueService } from '../../../infrastructure/queue/queue.service';
 import { PrismaService } from '../../../database/prisma.service';
-import { AllowedRegistrationRole } from '../dto/register.dto';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -133,9 +132,11 @@ describe('AuthService', () => {
       });
 
       const result = await service.register({
+        firstName: 'Karim',
+        lastName: 'Yasser',
         email: 'newuser@example.com',
         password: 'Password123!',
-        role: AllowedRegistrationRole.ATTENDEE,
+        confirmPassword: 'Password123!',
       });
 
       expect(result.email).toBe('newuser@example.com');
@@ -154,9 +155,11 @@ describe('AuthService', () => {
 
       await expect(
         service.register({
+          firstName: 'Karim',
+          lastName: 'Yasser',
           email: 'existing@example.com',
           password: 'Password123!',
-          role: AllowedRegistrationRole.ATTENDEE,
+          confirmPassword: 'Password123!',
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -294,6 +297,7 @@ describe('AuthService', () => {
         email: 'attendee@example.com',
         code: '123456',
         newPassword: 'NewPassword2026!',
+        confirmNewPassword: 'NewPassword2026!',
       });
 
       expect(result.success).toBe(true);

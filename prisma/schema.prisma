@@ -26,6 +26,13 @@ enum AccountStatus {
   @@map("account_status")
 }
 
+enum OAuthProvider {
+  GOOGLE
+  LINKEDIN
+
+  @@map("oauth_provider")
+}
+
 enum OutboxStatus {
   PENDING
   PROCESSING
@@ -54,6 +61,7 @@ model User {
   phone           String?       @db.VarChar(30)
   passwordHash    String        @map("password_hash") @db.VarChar(255)
   status          AccountStatus @default(PENDING)
+  oauthAccounts OAuthAccount[]
   emailVerifiedAt DateTime?     @map("email_verified_at") @db.Timestamptz(6)
   phoneVerifiedAt DateTime?     @map("phone_verified_at") @db.Timestamptz(6)
   lastLoginAt     DateTime?     @map("last_login_at") @db.Timestamptz(6)
@@ -133,6 +141,26 @@ model User {
   @@index([status])
   @@index([createdAt])
   @@map("users")
+}
+
+
+model OAuthAccount {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @map("user_id") @db.Uuid
+  provider          OAuthProvider
+  providerAccountId String        @map("provider_account_id") @db.VarChar(255)
+  providerEmail     String?       @map("provider_email") @db.VarChar(255)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider, providerEmail])
+  @@map("oauth_accounts")
 }
 
 model Role {

@@ -34,38 +34,90 @@ export class AdminApprovalsService {
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = query;
+
     const skip = (page - 1) * limit;
+
+    const businessRoles = ['SPONSOR', 'VENDOR', 'PROVIDER', 'EVENT_OWNER', 'MEDIA'];
 
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
-    };
 
-    if (status) {
-      where.status = status;
-    }
+      // By default, approval screen shows pending accounts only.
+      status: status ?? AccountStatus.PENDING,
 
-    if (role) {
-      where.userRoles = {
+      // Only business accounts belong to the approval workflow.
+      userRoles: {
         some: {
           role: {
-            name: role,
+            name: role
+              ? role
+              : {
+                  in: businessRoles,
+                },
           },
         },
-      };
-    }
+      },
+    };
 
     if (search) {
       where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
-        { sponsorProfile: { companyName: { contains: search, mode: 'insensitive' } } },
-        { vendorProfile: { companyName: { contains: search, mode: 'insensitive' } } },
-        { providerProfile: { businessName: { contains: search, mode: 'insensitive' } } },
-        { eventOwnerProfile: { organizationName: { contains: search, mode: 'insensitive' } } },
+        {
+          email: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          phone: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          sponsorProfile: {
+            companyName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          vendorProfile: {
+            companyName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          providerProfile: {
+            businessName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          eventOwnerProfile: {
+            organizationName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          mediaProfile: {
+            mediaOutlet: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
       ];
     }
 
     const orderBy: Prisma.UserOrderByWithRelationInput = {};
+
     if (sortBy === 'email') {
       orderBy.email = sortOrder;
     } else if (sortBy === 'status') {
@@ -81,33 +133,33 @@ export class AdminApprovalsService {
         take: limit,
         orderBy,
         include: {
-          userRoles: { include: { role: true } },
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
           sponsorProfile: true,
           vendorProfile: true,
           providerProfile: true,
           eventOwnerProfile: true,
           mediaProfile: true,
-          organizerProfile: true,
-          attendeeProfile: true,
         },
       }),
-      this.prisma.user.count({ where }),
+
+      this.prisma.user.count({
+        where,
+      }),
     ]);
 
     const items: ApprovalListItemDto[] = users.map((u) => {
-      const primaryRole = u.userRoles[0]?.role.name || 'UNKNOWN';
+      const businessRole = u.userRoles.find((ur) => businessRoles.includes(ur.role.name));
+
       const companyOrName =
         u.sponsorProfile?.companyName ||
         u.vendorProfile?.companyName ||
         u.providerProfile?.businessName ||
         u.eventOwnerProfile?.organizationName ||
         u.mediaProfile?.mediaOutlet ||
-        (u.attendeeProfile
-          ? `${u.attendeeProfile.firstName} ${u.attendeeProfile.lastName}`
-          : null) ||
-        (u.organizerProfile
-          ? `${u.organizerProfile.firstName} ${u.organizerProfile.lastName}`
-          : null) ||
         null;
 
       return {
@@ -115,7 +167,7 @@ export class AdminApprovalsService {
         email: u.email,
         phone: u.phone,
         status: u.status,
-        role: primaryRole,
+        role: businessRole?.role.name ?? 'UNKNOWN',
         companyOrName,
         emailVerified: u.emailVerifiedAt !== null,
         createdAt: u.createdAt.toISOString(),
@@ -197,15 +249,42 @@ export class AdminApprovalsService {
   ): Promise<ApprovalActionResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findFirst({
-        where: { id: userId, deletedAt: null },
-        include: { userRoles: { include: { role: true } } },
+        where: {
+          id: userId,
+          deletedAt: null,
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
       });
 
       if (!user) {
         throw new NotFoundException('Account not found');
       }
 
-      // Idempotency: repeated approve returns active status without duplicate side effects
+      const roleNames = user.userRoles.map((ur) => ur.role.name);
+
+      const businessRoles = ['SPONSOR', 'VENDOR', 'PROVIDER', 'EVENT_OWNER', 'MEDIA'];
+
+      const isBusinessAccount = roleNames.some((role) => businessRoles.includes(role));
+
+      // Only business accounts go through this approval workflow
+      if (!isBusinessAccount) {
+        throw new BadRequestException(
+          'Only business accounts can be approved through this endpoint',
+        );
+      }
+
+      // Email must be verified first
+      if (!user.emailVerifiedAt) {
+        throw new BadRequestException('Business account email must be verified before approval');
+      }
+
+      // Idempotent response
       if (user.status === AccountStatus.ACTIVE) {
         return {
           success: true,
@@ -219,11 +298,29 @@ export class AdminApprovalsService {
         throw new BadRequestException('Cannot approve a deactivated account');
       }
 
+      if (user.status === AccountStatus.SUSPENDED) {
+        throw new BadRequestException(
+          'Suspended accounts must be reactivated using the reactivate endpoint',
+        );
+      }
+
+      if (user.status === AccountStatus.REJECTED) {
+        throw new BadRequestException(
+          'Rejected accounts must be reactivated using the reactivate endpoint',
+        );
+      }
+
+      if (user.status !== AccountStatus.PENDING) {
+        throw new BadRequestException('Only pending business accounts can be approved');
+      }
+
       const previousStatus = user.status;
       const approvedAt = new Date();
 
       await tx.user.update({
-        where: { id: userId },
+        where: {
+          id: userId,
+        },
         data: {
           status: AccountStatus.ACTIVE,
           approvedAt,
@@ -232,8 +329,6 @@ export class AdminApprovalsService {
           rejectionReason: null,
         },
       });
-
-      const roleNames = user.userRoles.map((ur) => ur.role.name);
 
       await this.auditService.log({
         actorUserId: adminId,
@@ -287,15 +382,42 @@ export class AdminApprovalsService {
   ): Promise<ApprovalActionResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findFirst({
-        where: { id: userId, deletedAt: null },
-        include: { userRoles: { include: { role: true } } },
+        where: {
+          id: userId,
+          deletedAt: null,
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
       });
 
       if (!user) {
         throw new NotFoundException('Account not found');
       }
 
-      // Idempotency: repeated reject with same reason returns status
+      const roleNames = user.userRoles.map((ur) => ur.role.name);
+
+      const businessRoles = ['SPONSOR', 'VENDOR', 'PROVIDER', 'EVENT_OWNER', 'MEDIA'];
+
+      const isBusinessAccount = roleNames.some((role) => businessRoles.includes(role));
+
+      if (!isBusinessAccount) {
+        throw new BadRequestException(
+          'Only business accounts can be rejected through this endpoint',
+        );
+      }
+
+      const normalizedReason = reason?.trim();
+
+      if (!normalizedReason) {
+        throw new BadRequestException('Rejection reason is required');
+      }
+
+      // Idempotent behavior
       if (user.status === AccountStatus.REJECTED) {
         return {
           success: true,
@@ -305,19 +427,43 @@ export class AdminApprovalsService {
         };
       }
 
+      if (user.status === AccountStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Active accounts cannot be rejected. Use the suspend endpoint instead',
+        );
+      }
+
+      if (user.status === AccountStatus.SUSPENDED) {
+        throw new BadRequestException(
+          'Suspended accounts cannot be rejected through this endpoint',
+        );
+      }
+
+      if (user.status === AccountStatus.DEACTIVATED) {
+        throw new BadRequestException('Cannot reject a deactivated account');
+      }
+
+      if (user.status !== AccountStatus.PENDING) {
+        throw new BadRequestException('Only pending business accounts can be rejected');
+      }
+
       const previousStatus = user.status;
       const rejectedAt = new Date();
 
       await tx.user.update({
-        where: { id: userId },
+        where: {
+          id: userId,
+        },
         data: {
           status: AccountStatus.REJECTED,
           rejectedAt,
-          rejectionReason: reason,
+          rejectionReason: normalizedReason,
+
+          // Defensive cleanup
+          approvedAt: null,
+          approvedByUserId: null,
         },
       });
-
-      const roleNames = user.userRoles.map((ur) => ur.role.name);
 
       await this.auditService.log({
         actorUserId: adminId,
@@ -327,7 +473,7 @@ export class AdminApprovalsService {
         metadata: {
           previousStatus,
           newStatus: AccountStatus.REJECTED,
-          reason,
+          reason: normalizedReason,
           roles: roleNames,
         },
         ipAddress,
@@ -342,7 +488,7 @@ export class AdminApprovalsService {
           payload: {
             userId,
             email: user.email,
-            reason,
+            reason: normalizedReason,
             roles: roleNames,
             rejectedAt: rejectedAt.toISOString(),
           },
@@ -350,7 +496,9 @@ export class AdminApprovalsService {
         tx,
       );
 
-      this.logger.log(`Admin ${adminId} rejected account ${userId} with reason: ${reason}`);
+      this.logger.log(
+        `Admin ${adminId} rejected account ${userId} with reason: ${normalizedReason}`,
+      );
 
       return {
         success: true,
@@ -373,14 +521,36 @@ export class AdminApprovalsService {
   ): Promise<ApprovalActionResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findFirst({
-        where: { id: userId, deletedAt: null },
-        include: { userRoles: { include: { role: true } } },
+        where: {
+          id: userId,
+          deletedAt: null,
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
       });
 
       if (!user) {
         throw new NotFoundException('Account not found');
       }
 
+      const roleNames = user.userRoles.map((ur) => ur.role.name);
+
+      const businessRoles = ['SPONSOR', 'VENDOR', 'PROVIDER', 'EVENT_OWNER', 'MEDIA'];
+
+      const isBusinessAccount = roleNames.some((role) => businessRoles.includes(role));
+
+      if (!isBusinessAccount) {
+        throw new BadRequestException(
+          'Only business accounts can be suspended through this endpoint',
+        );
+      }
+
+      // Idempotent behavior
       if (user.status === AccountStatus.SUSPENDED) {
         return {
           success: true,
@@ -390,27 +560,52 @@ export class AdminApprovalsService {
         };
       }
 
+      if (user.status === AccountStatus.PENDING) {
+        throw new BadRequestException(
+          'Pending accounts cannot be suspended. Approve or reject the application instead',
+        );
+      }
+
+      if (user.status === AccountStatus.REJECTED) {
+        throw new BadRequestException(
+          'Rejected accounts cannot be suspended. Reactivate the account first',
+        );
+      }
+
+      if (user.status === AccountStatus.DEACTIVATED) {
+        throw new BadRequestException('Cannot suspend a deactivated account');
+      }
+
+      if (user.status !== AccountStatus.ACTIVE) {
+        throw new BadRequestException('Only active business accounts can be suspended');
+      }
+
+      const normalizedReason = reason?.trim() || null;
+
       const previousStatus = user.status;
       const suspendedAt = new Date();
 
       await tx.user.update({
-        where: { id: userId },
+        where: {
+          id: userId,
+        },
         data: {
           status: AccountStatus.SUSPENDED,
           suspendedAt,
-          suspensionReason: reason || null,
+          suspensionReason: normalizedReason,
         },
       });
 
-      // Immediate session invalidation: revoke all active refresh tokens
+      // Revoke all active refresh-token sessions
       await tx.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
+        where: {
+          userId,
+          revokedAt: null,
+        },
         data: {
           revokedAt: new Date(),
         },
       });
-
-      const roleNames = user.userRoles.map((ur) => ur.role.name);
 
       await this.auditService.log({
         actorUserId: adminId,
@@ -420,7 +615,7 @@ export class AdminApprovalsService {
         metadata: {
           previousStatus,
           newStatus: AccountStatus.SUSPENDED,
-          reason,
+          reason: normalizedReason,
           roles: roleNames,
         },
         ipAddress,
@@ -435,7 +630,7 @@ export class AdminApprovalsService {
           payload: {
             userId,
             email: user.email,
-            reason: reason || 'Account suspended by administrator',
+            reason: normalizedReason || 'Account suspended by administrator',
             roles: roleNames,
             suspendedAt: suspendedAt.toISOString(),
           },
@@ -443,7 +638,9 @@ export class AdminApprovalsService {
         tx,
       );
 
-      this.logger.warn(`Admin ${adminId} suspended account ${userId}. Reason: ${reason || 'N/A'}`);
+      this.logger.warn(
+        `Admin ${adminId} suspended account ${userId}. Reason: ${normalizedReason || 'N/A'}`,
+      );
 
       return {
         success: true,
@@ -465,44 +662,124 @@ export class AdminApprovalsService {
   ): Promise<ApprovalActionResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findFirst({
-        where: { id: userId, deletedAt: null },
-        include: { userRoles: { include: { role: true } } },
+        where: {
+          id: userId,
+          deletedAt: null,
+        },
+        include: {
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
       });
 
       if (!user) {
         throw new NotFoundException('Account not found');
       }
 
+      const roleNames = user.userRoles.map((ur) => ur.role.name);
+
+      const businessRoles = ['SPONSOR', 'VENDOR', 'PROVIDER', 'EVENT_OWNER', 'MEDIA'];
+
+      const isBusinessAccount = roleNames.some((role) => businessRoles.includes(role));
+
+      if (!isBusinessAccount) {
+        throw new BadRequestException(
+          'Only business accounts can be reactivated through this endpoint',
+        );
+      }
+
       if (user.status !== AccountStatus.SUSPENDED && user.status !== AccountStatus.REJECTED) {
-        throw new BadRequestException('Only suspended or rejected accounts can be reactivated');
+        throw new BadRequestException(
+          'Only suspended or rejected business accounts can be reactivated',
+        );
       }
 
       const previousStatus = user.status;
-      const reactivatedAt = new Date();
 
-      await tx.user.update({
-        where: { id: userId },
-        data: {
+      // Case 1:
+      // Previously approved account was suspended.
+      // Restore it directly to ACTIVE.
+      if (user.status === AccountStatus.SUSPENDED) {
+        await tx.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            status: AccountStatus.ACTIVE,
+            suspendedAt: null,
+            suspensionReason: null,
+          },
+        });
+
+        await this.auditService.log({
+          actorUserId: adminId,
+          action: 'BUSINESS_ACCOUNT_REACTIVATED',
+          resourceType: 'user',
+          resourceId: userId,
+          metadata: {
+            previousStatus,
+            newStatus: AccountStatus.ACTIVE,
+            roles: roleNames,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        await this.outboxService.enqueue(
+          {
+            eventType: 'ACCOUNT_REACTIVATED',
+            aggregateType: 'User',
+            aggregateId: userId,
+            payload: {
+              userId,
+              email: user.email,
+              roles: roleNames,
+              previousStatus,
+              newStatus: AccountStatus.ACTIVE,
+            },
+          },
+          tx,
+        );
+
+        this.logger.log(`Admin ${adminId} reactivated suspended account ${userId}`);
+
+        return {
+          success: true,
+          message: 'Suspended account reactivated successfully',
           status: AccountStatus.ACTIVE,
-          suspendedAt: null,
-          suspensionReason: null,
+          userId: user.id,
+        };
+      }
+
+      // Case 2:
+      // Rejected application must go back to review,
+      // not directly to ACTIVE.
+      await tx.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          status: AccountStatus.PENDING,
+
           rejectedAt: null,
           rejectionReason: null,
-          approvedAt: reactivatedAt,
-          approvedByUserId: adminId,
+
+          approvedAt: null,
+          approvedByUserId: null,
         },
       });
 
-      const roleNames = user.userRoles.map((ur) => ur.role.name);
-
       await this.auditService.log({
         actorUserId: adminId,
-        action: 'BUSINESS_ACCOUNT_REACTIVATED',
+        action: 'BUSINESS_ACCOUNT_REOPENED',
         resourceType: 'user',
         resourceId: userId,
         metadata: {
           previousStatus,
-          newStatus: AccountStatus.ACTIVE,
+          newStatus: AccountStatus.PENDING,
           roles: roleNames,
         },
         ipAddress,
@@ -511,26 +788,26 @@ export class AdminApprovalsService {
 
       await this.outboxService.enqueue(
         {
-          eventType: 'ACCOUNT_APPROVED',
+          eventType: 'ACCOUNT_REOPENED',
           aggregateType: 'User',
           aggregateId: userId,
           payload: {
             userId,
             email: user.email,
-            reactivated: true,
             roles: roleNames,
-            approvedAt: reactivatedAt.toISOString(),
+            previousStatus,
+            newStatus: AccountStatus.PENDING,
           },
         },
         tx,
       );
 
-      this.logger.log(`Admin ${adminId} reactivated account ${userId}`);
+      this.logger.log(`Admin ${adminId} reopened rejected account ${userId} for review`);
 
       return {
         success: true,
-        message: 'Account reactivated successfully',
-        status: AccountStatus.ACTIVE,
+        message: 'Rejected account returned to pending review',
+        status: AccountStatus.PENDING,
         userId: user.id,
       };
     });

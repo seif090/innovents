@@ -47,15 +47,33 @@ export default () => ({
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   },
   oauth: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    },
-    linkedin: {
-      clientId: process.env.LINKEDIN_CLIENT_ID,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-    },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl:
+      process.env.GOOGLE_CALLBACK_URL ||
+      'http://localhost:3000/api/v1/auth/oauth/google/callback',
   },
+
+  linkedin: {
+    clientId: process.env.LINKEDIN_CLIENT_ID,
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+  },
+
+  frontendRedirectUrl:
+    process.env.OAUTH_FRONTEND_REDIRECT_URL ||
+    'http://localhost:5173/auth/callback',
+
+  stateTtlSeconds: parseInt(
+    process.env.OAUTH_STATE_TTL_SECONDS || '600',
+    10,
+  ),
+
+  exchangeTtlSeconds: parseInt(
+    process.env.OAUTH_EXCHANGE_TTL_SECONDS || '60',
+    10,
+  ),
+},
   notifications: {
     pushProvider: process.env.PUSH_PROVIDER || 'mock',
     fcmServerKey: process.env.FCM_SERVER_KEY,

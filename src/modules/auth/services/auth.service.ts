@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { AccountStatus, OtpPurpose } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
@@ -21,6 +22,7 @@ import { RequestOtpDto, VerifyOtpDto } from '../dto/otp.dto';
 import { RefreshDto } from '../dto/refresh.dto';
 import { RequestPasswordResetDto, ConfirmPasswordResetDto } from '../dto/password-reset.dto';
 import { AuthResponseDto, AuthTokensDto, SafeUserDto } from '../dto/auth-response.dto';
+import { RegisterBusinessDto, AllowedBusinessRegistrationRole } from '../dto/register-business.dto';
 
 @Injectable()
 export class AuthService {
@@ -46,7 +48,10 @@ export class AuthService {
 
     // 1. Check if user already exists
     const existingUser = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail, deletedAt: null },
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
     });
 
     if (existingUser) {
@@ -54,32 +59,37 @@ export class AuthService {
     }
 
     if (dto.phone) {
+      const normalizedPhone = dto.phone.trim();
+
       const existingPhone = await this.prisma.user.findFirst({
-        where: { phone: dto.phone.trim(), deletedAt: null },
+        where: {
+          phone: normalizedPhone,
+          deletedAt: null,
+        },
       });
+
       if (existingPhone) {
         throw new ConflictException('An account with this phone number already exists');
       }
     }
 
     // 2. Validate role
+
     const roleRecord = await this.prisma.role.findUnique({
-      where: { name: dto.role },
+      where: { name: 'ATTENDEE' },
     });
 
     if (!roleRecord) {
-      throw new BadRequestException(`Role '${dto.role}' is not configured in the system`);
+      throw new InternalServerErrorException('ATTENDEE role is not configured in the system');
     }
-
     // 3. Hash password
     const passwordHash = await this.passwordService.hash(dto.password);
 
     // 4. Initial account status
     const initialStatus = AccountStatus.PENDING;
 
-    // 5. Atomic transaction: User + UserRole + OTP Challenge + Outbox Event
+    // 5. Create User + ATTENDEE role + profile atomically
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create user
       const user = await tx.user.create({
         data: {
           email: normalizedEmail,
@@ -89,7 +99,6 @@ export class AuthService {
         },
       });
 
-      // Assign role
       await tx.userRole.create({
         data: {
           userId: user.id,
@@ -97,17 +106,25 @@ export class AuthService {
         },
       });
 
+      await tx.attendeeProfile.create({
+        data: {
+          userId: user.id,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+        },
+      });
+
       return user;
     });
 
-    // 6. Create OTP challenge & queue email
+    // 6. Create OTP challenge
     const otpResult = await this.otpService.createChallenge(
       normalizedEmail,
       OtpPurpose.EMAIL_VERIFICATION,
       result.id,
     );
 
-    // Atomic outbox event for reliable email delivery
+    // 7. Store outbox event
     await this.outboxService.enqueue({
       eventType: 'EMAIL_VERIFICATION_REQUESTED',
       aggregateType: 'User',
@@ -119,19 +136,22 @@ export class AuthService {
       },
     });
 
-    // Queue email dispatch job
+    // 8. Queue email
     await this.queueService.addJob(QUEUE_NAMES.EMAIL, 'send-otp-email', {
       to: normalizedEmail,
       subject: 'Verify your INOVENT account',
       html: `<p>Your INOVENT verification code is: <strong>${otpResult.code}</strong>. It expires in 5 minutes.</p>`,
     });
 
+    // 9. Audit
     await this.auditService.log({
       actorUserId: result.id,
       action: 'USER_REGISTERED',
       resourceType: 'user',
       resourceId: result.id,
-      metadata: { role: dto.role },
+      metadata: {
+        role: 'ATTENDEE',
+      },
       ipAddress,
       userAgent,
     });
@@ -139,6 +159,244 @@ export class AuthService {
     return {
       message:
         'Registration successful. A 6-digit verification code has been dispatched to your email.',
+      email: normalizedEmail,
+    };
+  }
+
+  async registerBusiness(
+    dto: RegisterBusinessDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ message: string; email: string }> {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const normalizedPhone = dto.phone?.trim() || null;
+
+    // 1. Check duplicate email
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('An account with this email address already exists');
+    }
+
+    // 2. Check duplicate phone
+    if (normalizedPhone) {
+      const existingPhone = await this.prisma.user.findFirst({
+        where: {
+          phone: normalizedPhone,
+          deletedAt: null,
+        },
+      });
+
+      if (existingPhone) {
+        throw new ConflictException('An account with this phone number already exists');
+      }
+    }
+
+    // 3. Find requested business role
+    const roleRecord = await this.prisma.role.findUnique({
+      where: {
+        name: dto.role,
+      },
+    });
+
+    if (!roleRecord) {
+      throw new InternalServerErrorException(`${dto.role} role is not configured in the system`);
+    }
+
+    // 4. Hash password
+    const passwordHash = await this.passwordService.hash(dto.password);
+
+    // Business accounts remain PENDING until admin approval
+    const initialStatus = AccountStatus.PENDING;
+
+    // 5. Create User + Role + correct Business Profile atomically
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          passwordHash,
+          status: initialStatus,
+        },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId: createdUser.id,
+          roleId: roleRecord.id,
+        },
+      });
+
+      switch (dto.role) {
+        case AllowedBusinessRegistrationRole.SPONSOR: {
+          if (!dto.companyName) {
+            throw new BadRequestException('Company name is required for Sponsor registration');
+          }
+
+          await tx.sponsorProfile.create({
+            data: {
+              userId: createdUser.id,
+              companyName: dto.companyName.trim(),
+              contactName: dto.contactName?.trim() || null,
+              contactEmail: normalizedEmail,
+              contactPhone: normalizedPhone,
+              website: dto.website?.trim() || null,
+              description: dto.description?.trim() || null,
+              city: dto.city?.trim() || null,
+              country: dto.country?.trim() || null,
+            },
+          });
+
+          break;
+        }
+
+        case AllowedBusinessRegistrationRole.VENDOR: {
+          if (!dto.companyName || !dto.serviceCategory) {
+            throw new BadRequestException(
+              'Company name and service category are required for Vendor registration',
+            );
+          }
+
+          await tx.vendorProfile.create({
+            data: {
+              userId: createdUser.id,
+              companyName: dto.companyName.trim(),
+              serviceCategory: dto.serviceCategory.trim(),
+              contactName: dto.contactName?.trim() || null,
+              contactEmail: normalizedEmail,
+              contactPhone: normalizedPhone,
+              website: dto.website?.trim() || null,
+              description: dto.description?.trim() || null,
+              city: dto.city?.trim() || null,
+              country: dto.country?.trim() || null,
+            },
+          });
+
+          break;
+        }
+
+        case AllowedBusinessRegistrationRole.PROVIDER: {
+          if (!dto.businessName || !dto.providerType) {
+            throw new BadRequestException(
+              'Business name and provider type are required for Provider registration',
+            );
+          }
+
+          await tx.providerProfile.create({
+            data: {
+              userId: createdUser.id,
+              businessName: dto.businessName.trim(),
+              providerType: dto.providerType.trim(),
+              contactName: dto.contactName?.trim() || null,
+              contactEmail: normalizedEmail,
+              contactPhone: normalizedPhone,
+              website: dto.website?.trim() || null,
+              description: dto.description?.trim() || null,
+              city: dto.city?.trim() || null,
+              country: dto.country?.trim() || null,
+            },
+          });
+
+          break;
+        }
+
+        case AllowedBusinessRegistrationRole.EVENT_OWNER: {
+          if (!dto.organizationName) {
+            throw new BadRequestException(
+              'Organization name is required for Event Owner registration',
+            );
+          }
+
+          await tx.eventOwnerProfile.create({
+            data: {
+              userId: createdUser.id,
+              organizationName: dto.organizationName.trim(),
+              contactName: dto.contactName?.trim() || null,
+              contactEmail: normalizedEmail,
+              contactPhone: normalizedPhone,
+              website: dto.website?.trim() || null,
+              description: dto.description?.trim() || null,
+              city: dto.city?.trim() || null,
+              country: dto.country?.trim() || null,
+            },
+          });
+
+          break;
+        }
+
+        case AllowedBusinessRegistrationRole.MEDIA: {
+          if (!dto.mediaOutlet) {
+            throw new BadRequestException('Media outlet is required for Media registration');
+          }
+
+          await tx.mediaProfile.create({
+            data: {
+              userId: createdUser.id,
+              mediaOutlet: dto.mediaOutlet.trim(),
+              contactName: dto.contactName?.trim() || null,
+              contactEmail: normalizedEmail,
+              contactPhone: normalizedPhone,
+              website: dto.website?.trim() || null,
+            },
+          });
+
+          break;
+        }
+
+        default:
+          throw new BadRequestException('Invalid business registration role');
+      }
+
+      return createdUser;
+    });
+
+    // 6. Create email verification OTP
+    const otpResult = await this.otpService.createChallenge(
+      normalizedEmail,
+      OtpPurpose.EMAIL_VERIFICATION,
+      user.id,
+    );
+
+    // 7. Create outbox event
+    await this.outboxService.enqueue({
+      eventType: 'EMAIL_VERIFICATION_REQUESTED',
+      aggregateType: 'User',
+      aggregateId: user.id,
+      payload: {
+        to: normalizedEmail,
+        code: otpResult.code,
+        purpose: 'EMAIL_VERIFICATION',
+      },
+    });
+
+    // 8. Send verification email
+    await this.queueService.addJob(QUEUE_NAMES.EMAIL, 'send-otp-email', {
+      to: normalizedEmail,
+      subject: 'Verify your INOVENT business account',
+      html: `<p>Your INOVENT verification code is: <strong>${otpResult.code}</strong>. It expires in 5 minutes.</p>`,
+    });
+
+    // 9. Audit
+    await this.auditService.log({
+      actorUserId: user.id,
+      action: 'BUSINESS_USER_REGISTERED',
+      resourceType: 'user',
+      resourceId: user.id,
+      metadata: {
+        role: dto.role,
+      },
+      ipAddress,
+      userAgent,
+    });
+
+    return {
+      message:
+        'Business registration successful. A 6-digit verification code has been dispatched to your email. Your account will require administrative approval after email verification.',
       email: normalizedEmail,
     };
   }
@@ -204,24 +462,41 @@ export class AuthService {
   ): Promise<{ success: boolean; message: string }> {
     const normalizedEmail = dto.email.trim().toLowerCase();
 
+    const genericResponse = {
+      success: true,
+      message: 'If the account exists, a verification code has been sent.',
+    };
+
     const user = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail, deletedAt: null },
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
     });
 
-    // Generate OTP
+    // EMAIL VERIFICATION rules
+    if (dto.purpose === OtpPurpose.EMAIL_VERIFICATION) {
+      // Do not reveal whether the account exists
+      if (!user) {
+        return genericResponse;
+      }
+
+      // Already verified → don't generate/send another OTP
+      if (user.emailVerifiedAt) {
+        return genericResponse;
+      }
+    }
+
+    // Generate OTP only when appropriate
     const otpResult = await this.otpService.createChallenge(normalizedEmail, dto.purpose, user?.id);
 
-    // Enqueue outbox & email queue
     await this.queueService.addJob(QUEUE_NAMES.EMAIL, 'send-otp-email', {
       to: normalizedEmail,
       subject: `Your INOVENT code for ${dto.purpose.replace(/_/g, ' ').toLowerCase()}`,
       html: `<p>Your verification code is: <strong>${otpResult.code}</strong>. It expires in 5 minutes.</p>`,
     });
 
-    return {
-      success: true,
-      message: 'If the account exists, a verification code has been sent.',
-    };
+    return genericResponse;
   }
 
   /**
@@ -435,7 +710,7 @@ export class AuthService {
   ): Promise<{ success: boolean; message: string }> {
     const normalizedEmail = dto.email.trim().toLowerCase();
 
-    // 1. Verify OTP
+    // 1. Verify password-reset OTP
     await this.otpService.verifyChallenge(
       normalizedEmail,
       dto.code,
@@ -446,30 +721,48 @@ export class AuthService {
 
     // 2. Fetch user
     const user = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail, deletedAt: null },
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
     });
 
     if (!user) {
-      throw new BadRequestException('User account not found');
+      throw new BadRequestException('Invalid or expired password reset request');
     }
 
-    // 3. Validate new password
+    // 3. Validate password strength
     if (!this.passwordService.validateStrength(dto.newPassword)) {
       throw new BadRequestException(
         'New password must be at least 8 characters and contain both letters and numbers',
       );
     }
 
-    // 4. Update password
+    // 4. Prevent reusing the current password
+    const isSamePassword = await this.passwordService.compare(dto.newPassword, user.passwordHash);
+
+    if (isSamePassword) {
+      throw new BadRequestException('New password must be different from your current password');
+    }
+
+    // 5. Hash new password
     const newPasswordHash = await this.passwordService.hash(dto.newPassword);
+
+    // 6. Update password
     await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+      where: {
+        id: user.id,
+      },
+      data: {
+        passwordHash: newPasswordHash,
+      },
     });
 
-    // 5. Invalidate all existing refresh sessions for this user
+    // 7. Revoke ALL sessions:
+    // refresh tokens + access tokens
     await this.tokenService.revokeAllUserSessions(user.id);
 
+    // 8. Audit
     await this.auditService.log({
       actorUserId: user.id,
       action: AUTH_EVENTS.PASSWORD_CHANGED,

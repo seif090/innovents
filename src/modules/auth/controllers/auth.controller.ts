@@ -1,4 +1,6 @@
-import { Controller, Post, Body, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, Query, HttpCode, HttpStatus } from '@nestjs/common';
+
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -18,11 +20,67 @@ import { RequestPasswordResetDto, ConfirmPasswordResetDto } from '../dto/passwor
 import { AuthResponseDto, AuthTokensDto } from '../dto/auth-response.dto';
 import { ErrorResponseDto } from '../../../common/dto/error-response.dto';
 import { Public } from '../decorators/public.decorator';
+import { OAuthService } from '../services/oauth.service';
+import { ConfigService } from '@nestjs/config';
+import { OAuthExchangeDto } from '../dto/oauth-exchange.dto';
+import { RegisterBusinessDto } from '../dto/register-business.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly oauthService: OAuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Public()
+  @Get('oauth/google')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Start Google OAuth authentication',
+    description:
+      'Generates a secure Google OAuth authorization URL using state and PKCE, then redirects the user to Google.',
+  })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirects the user to Google authentication.',
+  })
+  async googleOAuth(@Res() res: Response): Promise<void> {
+    const url = await this.oauthService.getGoogleAuthorizationUrl();
+
+    res.redirect(HttpStatus.FOUND, url);
+  }
+
+  @Public()
+  @Get('oauth/google/callback')
+  @ApiOperation({
+    summary: 'Handle Google OAuth callback',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Google authentication completed successfully.',
+  })
+  async googleOAuthCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const result = await this.oauthService.handleGoogleCallback(code, state);
+
+    const exchangeCode = await this.oauthService.createOAuthExchangeCode(result);
+
+    const frontendUrl = this.configService.get<string>('oauth.frontendRedirectUrl');
+
+    res.redirect(HttpStatus.FOUND, `${frontendUrl}?code=${encodeURIComponent(exchangeCode)}`);
+  }
+
+  @Public()
+  @Post('oauth/exchange')
+  @HttpCode(HttpStatus.OK)
+  async exchangeOAuthCode(@Body() dto: OAuthExchangeDto) {
+    return this.oauthService.exchangeOAuthCode(dto.code);
+  }
 
   @Public()
   @Post('register')
@@ -64,6 +122,34 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<{ message: string; email: string }> {
     return this.authService.register(dto, req.ip, req.headers['user-agent']);
+  }
+
+  @Public()
+  @Post('register/business')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Register a business account',
+    description:
+      'Registers a Sponsor, Vendor, Provider, Event Owner, or Media account. Email verification is required, followed by administrative approval.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Business registration successful. Verification code dispatched.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid business registration data',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Email address or phone number already exists',
+  })
+  async registerBusiness(
+    @Body() dto: RegisterBusinessDto,
+    @Req() req: Request,
+  ): Promise<{ message: string; email: string }> {
+    return this.authService.registerBusiness(dto, req.ip, req.headers['user-agent']);
   }
 
   @Public()

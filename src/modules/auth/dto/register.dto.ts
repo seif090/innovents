@@ -1,14 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-  Matches,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { Match } from '../../../common/decorators/match.decorator';
 
 export enum AllowedRegistrationRole {
   ATTENDEE = 'ATTENDEE',
@@ -20,6 +13,30 @@ export enum AllowedRegistrationRole {
 }
 
 export class RegisterDto {
+  @ApiProperty({
+    example: 'Karim',
+    maxLength: 100,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  @Matches(/\S/, {
+    message: 'First name cannot be empty',
+  })
+  firstName!: string;
+
+  @ApiProperty({
+    example: 'Yasser',
+    maxLength: 100,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  @Matches(/\S/, {
+    message: 'Last name cannot be empty',
+  })
+  lastName!: string;
+
   @ApiProperty({
     description: 'User email address',
     example: 'attendee@example.com',
@@ -52,14 +69,13 @@ export class RegisterDto {
   password!: string;
 
   @ApiProperty({
-    description: 'Account role to register for',
-    enum: AllowedRegistrationRole,
-    example: AllowedRegistrationRole.ATTENDEE,
+    example: 'StrongPassword123',
+    description: 'Must match the password field',
   })
-  @IsEnum(AllowedRegistrationRole, {
-    message:
-      'Role must be one of: ATTENDEE, SPONSOR, VENDOR, PROVIDER, EVENT_OWNER, MEDIA. Organizers are invitation-only.',
-  })
+  @IsString()
   @IsNotEmpty()
-  role!: AllowedRegistrationRole;
+  @Match('password', {
+    message: 'Passwords do not match',
+  })
+  confirmPassword!: string;
 }
